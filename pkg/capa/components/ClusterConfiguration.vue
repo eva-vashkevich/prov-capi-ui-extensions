@@ -8,7 +8,6 @@ import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import { RcSection } from '@components/RcSection';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
-import Networking from '.././components/Networking.vue';
 import { removeEmptyFields } from '../utils';
 import { NORMAN } from '@shell/config/types';
 
@@ -24,13 +23,9 @@ const defaultConfig = {
     network: {
       additionalControlPlaneIngressRules: [{ protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'] }], // allow all traffic from control plane security groups
       additionalNodeIngressRules:         [{ protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'] }],
-      cni:                                { cniIngressRules: [] },
-      securityGroupOverrides:             {},
-      vpc:                                { id: 'vpc-07cdd250a077f6773' }, // id: '', cidrBlock: '', ipv6: {},
+      vpc:                                { id: 'vpc-07cdd250a077f6773' },
       subnets:                            [{ id: 'subnet-02e4caf6f4ee75111' }]
     },
-    sshKeyName:               '',
-    additionalTags:           {},
     identityRef:              { name: 'cluster-identity', kind: 'AWSClusterStaticIdentity' },
     controlPlaneLoadBalancer: {
       healthCheckProtocol: 'TCP',
@@ -66,13 +61,10 @@ if (value.value && !value.value.spec) {
 
 const store = useStore();
 const { t } = useI18n(store);
-// const config = ref({});
 const ec2Client = ref(null);
 const regionInfo = ref(null);
 
-// const clusterSchema = computed(() => {
-//   return store.getters['management/schemaFor'](AWS_CLUSTER_SCHEMA, true, false);
-// });
+
 
 const region: WritableComputedRef<string> = computed({
   get: () => value.value?.spec?.region || '',
@@ -95,16 +87,6 @@ const regionOptions = computed(() => {
   }).sort();
 });
 
-const network = computed({
-  get: () => value.value?.spec?.network || '',
-  set: (newNetwork: string) => {
-    if (value.value) {
-      value.value.spec = value.value.spec || {};
-      value.value.spec.network = newNetwork;
-    }
-    emit('update:value', value.value);
-  },
-});
 
 function initDefaultRegion() {
   const region = value.value?.spec?.region || credentialId.value?.decodedData?.defaultRegion || store.getters['aws/defaultRegion'];
@@ -115,7 +97,6 @@ function initDefaultRegion() {
 }
 
 async function getRegions() {
-  // TODO get regions based on credentials
   if (!ec2Client.value || !region.value || !credentialId.value) {
     regionInfo.value = [];
 
@@ -150,7 +131,6 @@ onMounted(async() => {
     cloudCredentialId: credentialId.value
   });
   getRegions();
-  // TODO remove non-required field
   const valueWithDefaults = merge({}, defaultConfig, value.value);
 
   valueWithDefaults.spec.identityRef.name = identityRef;
@@ -182,12 +162,6 @@ onMounted(async() => {
           :placeholder="t('capa.clusterConfig.region.placeholder')"
         />
       </div>
-      <Networking
-        v-model:value="network"
-        :mode="mode"
-        :region="region"
-        :credentialId="credentialId"
-      />
     </RcSection>
   </div>
 </template>

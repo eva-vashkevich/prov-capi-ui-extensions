@@ -89,3 +89,8 @@ capa:
         title: Additional tags
         description: Tags that CAPA will add to managed AWS resources, in addition to the usual ones it adds.
         add: Add tag
+  errors:
+    creatingInfrastructureClusterConfig: "Error creating infrastructure cluster config: {error}"
+    removingOldMachineConfig: "Error removing old machine config: {error}"
+    savingMachineConfig: "Error saving machine config: {error}"
+    savingInfrastructureCluster: "Error saving infrastructure cluster: {error}"

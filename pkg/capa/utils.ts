@@ -1,5 +1,6 @@
 import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
+import { AWS_MACHINE_TEMPLATE_SCHEMA } from './types/capa';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -20,7 +21,15 @@ spec:
       - --v=5
       - --cloud-provider=aws`;
 
-export async function initInfrastructureCluster(value: any, clusterSchema: string, context: any, isEdit = false): Promise<void> {
+type Translator = (key: string, args?: Record<string, string>) => string;
+
+function formatErrorMessage(t: Translator | undefined, key: string, e: unknown): string {
+  const error = e instanceof Error ? e.message : String(e);
+
+  return t ? t(key, { error }) : `${ key }: ${ error }`;
+}
+
+export async function initInfrastructureCluster(value: any, clusterSchema: string, context: any): Promise<void> {
   let config;
   let configMissing = false;
 
@@ -59,75 +68,88 @@ export async function initInfrastructureCluster(value: any, clusterSchema: strin
           metadata: { namespace: DEFAULT_WORKSPACE }
         });
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.log('Error creating cluster config', e);
+
+        throw new Error(formatErrorMessage(context.t, 'capa.errors.creatingInfrastructureClusterConfig', e));
       }
     }
 
     // TODO handle case where config is still missing and make sure spec is setup correctly
-    // TODO apply defaults
-    // console.log('config', config);
     return config || {};
   }
 }
 
-export async function saveMachinePoolConfigs(pools: any[], cluster: any, dispatch: Function) {
+export async function createMachinePoolMachineConfig(machineConfigSchema: any, context: any){
+  const machineConfigType = machineConfigSchema?.id || AWS_MACHINE_TEMPLATE_SCHEMA;
+
+  await context.dispatch('management/waitForSchema', { type: machineConfigType });
+
+  const createConfig = await context.dispatch('management/createPopulated', {
+    type:     AWS_MACHINE_TEMPLATE_SCHEMA,
+    metadata: { namespace: DEFAULT_WORKSPACE }
+  });
+
+  const config = createConfig || {};
+
+  // TODO apply some defaults
+  return config;
+};
+
+export async function saveMachinePoolConfigs(pools: any[], cluster: any, context: any) {
   const finalPools = [];
 
   for (const entry of pools) {
     if (entry.remove) {
       continue;
     }
-    // Capitals and such aren't allowed;
+
     entry.pool.name = normalizeName(entry.pool.name) || 'pool';
     const prefix = `${ cluster.metadata.name }-${ entry.pool.name }`;
 
     const prefixFormatted = prefix.substr(0, 50).toLowerCase();
+    try{
+      if (entry.create) {
+        if (!entry.config.metadata?.name) {
+          entry.config.metadata.generateName = `nc-${ prefixFormatted }-`;
+        }
 
-    if (entry.create) {
-      console.log('CREATE');
-      if (!entry.config.metadata?.name) {
-        entry.config.metadata.generateName = `nc-${ prefixFormatted }-`;
+        const neu = await entry.config.save();
+
+        entry.config = neu;
+        entry.pool.machineConfigRef.name = neu.metadata.name;
+        entry.create = false;
+        entry.update = true;
+        entry.config.spec.template.spec.additionalTags = { created: 'created' };
+
+      } else if (entry.update) {
+        // Upstream CAPI machine templates are immutable: create a replacement resource
+        // with the current spec values, update the pool reference, then remove the old one.
+        const oldConfig = entry.config;
+
+        // Clone before mutating so oldConfig retains its identity (links/id) for removal.
+        const newConfig = await context.dispatch('management/clone', { resource: oldConfig });
+
+        delete newConfig.id;
+        delete newConfig.metadata.name;
+        delete newConfig.metadata.resourceVersion;
+        delete newConfig.metadata.uid;
+        delete newConfig.links;
+        newConfig.metadata.generateName = `nc-${ prefixFormatted }-`;
+        newConfig.spec.template.spec.instanceType = 't3.large';
+
+        const neu = await newConfig.save();
+
+        entry.config = neu;
+        entry.pool.machineConfigRef.name = neu.metadata.name;
+
+        try {
+          await oldConfig.remove();
+        } catch (e) {
+          throw new Error(formatErrorMessage(context.t, 'capa.errors.removingOldMachineConfig', e));
+      
+        }
       }
-
-      const neu = await entry.config.save();
-
-      entry.config = neu;
-      entry.pool.machineConfigRef.name = neu.metadata.name;
-      entry.create = false;
-      entry.update = true;
-      entry.config.spec.template.spec.additionalTags = { created: 'created' };
-
-      // this.initialMachinePoolsValues[entry.config.id] = clone(neu);
-    } else if (entry.update) {
-      console.log('UPDATE');
-      // Upstream CAPI machine templates are immutable: create a replacement resource
-      // with the current spec values, update the pool reference, then remove the old one.
-      const oldConfig = entry.config;
-
-      // Clone before mutating so oldConfig retains its identity (links/id) for removal.
-      const newConfig = await dispatch('management/clone', { resource: oldConfig });
-
-      delete newConfig.id;
-      delete newConfig.metadata.name;
-      delete newConfig.metadata.resourceVersion;
-      delete newConfig.metadata.uid;
-      delete newConfig.links;
-      newConfig.metadata.generateName = `nc-${ prefixFormatted }-`;
-      newConfig.spec.template.spec.instanceType = 't3.large';
-      console.log('newConfig', newConfig);
-
-      const neu = await newConfig.save();
-
-      entry.config = neu;
-      entry.pool.machineConfigRef.name = neu.metadata.name;
-
-      try {
-        await oldConfig.remove();
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn('Failed to remove old machine config', e);
-      }
+    } catch(e) {
+      throw new Error(formatErrorMessage(context.t, 'capa.errors.savingMachineConfig', e));
     }
 
     finalPools.push(entry.pool);
@@ -136,7 +158,7 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, dispatc
   cluster.spec.rkeConfig.machinePools = finalPools;
 }
 
-export async function saveInfrastructureCluster(value: any, infrastructureCluster: any, isEdit = false): Promise<void> {
+export async function saveInfrastructureCluster(value: any, infrastructureCluster: any, context: any, isEdit = false): Promise<void> {
   if (!infrastructureCluster) {
     return;
   }
@@ -168,8 +190,7 @@ export async function saveInfrastructureCluster(value: any, infrastructureCluste
       };
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log('Error saving infrastructure cluster', e);
+    throw new Error(formatErrorMessage(context.t, 'capa.errors.savingInfrastructureCluster', e));
   }
 }
 
