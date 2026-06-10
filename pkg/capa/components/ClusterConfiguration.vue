@@ -124,6 +124,7 @@ const additionalNodeIngressRules = specComputed<any[]>('spec.network.additionalN
 const additionalTags = specComputed<{}>('spec.additionalTags', {});
 const cniIngressRules = specComputed<any[]>('spec.network.cni.cniIngressRules', []);
 
+// ipv6 is "enabled" by setting an empty object and "disabled" by deleting the ipv6 field
 const ipv6: WritableComputedRef<object | null> = computed({
   get: () => value?.value?.spec?.network?.ipv6 || null,
   set: (neu: object | undefined) => {

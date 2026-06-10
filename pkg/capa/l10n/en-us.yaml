@@ -183,7 +183,6 @@ cluster:
     regionRequired: Region is required.
     vpcRequired: VPC is required
     subnetRequired: At least one subnet is required
-    invalidCidr: Invalid CIDR format
     invalidIpv4Cidr: Invalid IPv4 CIDR format
     invalidIpv6Cidr: Invalid IPv6 CIDR format
     vpcCidrBlock: VPC CIDR block must be a valid IPv4 CIDR (e.g., 10.0.0.0/16).

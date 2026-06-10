@@ -10,5 +10,6 @@
     "jsconfig.json": true,
     "LICENSE": true,
     "pkg/**/.shell": true
-  }
+  },
+  "js/ts.tsdk.path": "node_modules/typescript/lib"
 }
