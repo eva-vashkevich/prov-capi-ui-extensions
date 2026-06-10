@@ -35,7 +35,7 @@ interface Props {
   vpcId: string;
   subnets: {id: string}[];
   cidrBlock?: string;
-  ipv6?: {};
+  ipv6?: {} | null;
   mode?: string;
   credentialId: any;
   region?: string;
@@ -54,7 +54,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   mode:                               _CREATE,
   region:                             '',
-  ipv6:                               undefined,
+  ipv6:                               null,
   cidrBlock:                          '',
   securityGroupOverrides:             () => ({}),
   additionalControlPlaneIngressRules: () => [],

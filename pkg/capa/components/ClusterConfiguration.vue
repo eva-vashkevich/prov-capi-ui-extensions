@@ -11,7 +11,7 @@ import merge from 'lodash/merge';
 import Networking from './Networking.vue';
 import { removeEmptyFields } from '../utils';
 import { NORMAN } from '@shell/config/types';
-import { isEmpty, set } from '@shell/utils/object.js';
+import { isEmpty, get, set } from '@shell/utils/object.js';
 import KeyValue from '@shell/components/form/KeyValue';
 import * as AWS from '@shell/types/aws-sdk';
 import { useForm } from 'vee-validate';
@@ -76,7 +76,6 @@ if (value.value && !value.value.spec) {
 const store = useStore();
 const { t } = useI18n(store);
 const useUnmanagedNetwork = ref(false); // used by a radio in networking and doesn't correspond to anything in cluster config - tracking it here to use w/ validators
-// const config = ref({});
 const ec2Client = ref(null);
 const regionInfo = ref([]);
 const sshKeyInfo = ref([]);
@@ -102,145 +101,36 @@ const { errors } = useForm({
   }
 });
 
-// TODO nb generic set-if-not-set for region, sshKeyName, vpcId, firstSubnetId, se3curityGroupOverrides, xyzIngressRules
-// use object util set to set nested fields that may not exist yet
-// how to delete? tbd
-const region: WritableComputedRef<string> = computed({
-  get: () => value?.value?.spec?.region || '',
-  set: (newRegion: string) => {
-    if (value.value) {
-      value.value.spec = value.value.spec || {};
-      value.value.spec.region = newRegion;
-    }
-    emit('update:value', value.value);
-  },
-});
+// Helper to create computed properties backed by a nested path on value.value
+// `set` from @shell/utils/object creates intermediate objects along the path
+function specComputed<T>(path: string, defaultValue: T): WritableComputedRef<T> {
+  return computed({
+    get: () => get(value.value, path) ?? defaultValue,
+    set: (neu: T) => {
+      set(value.value, path, neu);
+      emit('update:value', value.value);
+    },
+  });
+}
 
-const sshKeyName: WritableComputedRef<string> = computed({
-  get: () => value?.value?.spec?.sshKeyName || '',
-  set: (newKey: string) => {
-    if (value.value) {
-      value.value.spec = value.value.spec || {};
-      value.value.spec.sshKeyName = newKey;
-    }
-    emit('update:value', value.value);
-  },
-});
+const region = specComputed<string>('spec.region', '');
+const sshKeyName = specComputed<string>('spec.sshKeyName', '');
+const vpcId = specComputed<string>('spec.network.vpc.id', '');
+const cidrBlock = specComputed<string>('spec.network.vpc.cidrBlock', '');
+const securityGroupOverrides = specComputed<{}>('spec.network.securityGroupOverrides', {});
+const subnets = specComputed<{id: string}[]>('spec.network.subnets', []);
+const additionalControlPlaneIngressRules = specComputed<any[]>('spec.network.additionalControlPlaneIngressRules', []);
+const additionalNodeIngressRules = specComputed<any[]>('spec.network.additionalNodeIngressRules', []);
+const additionalTags = specComputed<{}>('spec.additionalTags', {});
+const cniIngressRules = specComputed<any[]>('spec.network.cni.cniIngressRules', []);
 
-const vpcId: WritableComputedRef<string> = computed({
-  get: () => value?.value?.spec?.network?.vpc?.id || '',
-  set: (vpc: string) => {
-    if (value.value) {
-      if (!value.value?.spec?.network?.vpc) {
-        set(value.value, 'spec.network.vpc', { id: vpc });
-      } else {
-        value.value.spec.network.vpc.id = vpc;
-      }
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const cidrBlock: WritableComputedRef<string> = computed({
-  get: () => value?.value?.spec?.network?.vpc?.cidrBlock || '',
-  set: (cidr: string) => {
-    if (value.value) {
-      set(value.value, 'spec.network.vpc.cidrBlock', cidr);
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const ipv6: WritableComputedRef<string> = computed({
+const ipv6: WritableComputedRef<object | null> = computed({
   get: () => value?.value?.spec?.network?.ipv6 || null,
   set: (neu: object | undefined) => {
-    if (value.value && neu) {
-      if (!value.value.spec.network) {
-        set(value.value, 'spec.network', {});
-      }
-      value.value.spec.network.ipv6 = neu;
-    } else {
+    if (neu) {
+      set(value.value, 'spec.network.ipv6', neu);
+    } else if (value.value?.spec?.network) {
       delete value.value.spec.network.ipv6;
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const securityGroupOverrides: WritableComputedRef<{}> = computed({
-  get: () => value?.value?.spec?.network?.securityGroupOverrides || {},
-  set: (neu: any) => {
-    if (value.value) {
-      if (!value.value?.spec?.network) {
-        set(value.value, 'spec.network', { securityGroupOverrides: neu });
-      } else {
-        value.value.spec.network.securityGroupOverrides = neu;
-      }
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const subnets: WritableComputedRef<{id: string}[]> = computed({
-  get: () => value?.value?.spec?.network?.subnets || [],
-  set: (neu: {id: string}[]) => {
-    if (value.value) {
-      if (!value.value?.spec?.network) {
-        set(value.value, 'spec.network', { subnets: neu });
-      } else {
-        value.value.spec.network.subnets = neu;
-      }
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const additionalControlPlaneIngressRules = computed({
-  get: () => value?.value?.spec?.network?.additionalControlPlaneIngressRules || [],
-  set: (rules: any[]) => {
-    if (value.value) {
-      if (!value.value?.spec?.network) {
-        set(value.value, 'spec.network', {});
-      }
-      value.value.spec.network.additionalControlPlaneIngressRules = rules;
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const additionalNodeIngressRules = computed({
-  get: () => value?.value?.spec?.network?.additionalNodeIngressRules || [],
-  set: (rules: any[]) => {
-    if (value.value) {
-      if (!value.value?.spec?.network) {
-        set(value.value, 'spec.network', {});
-      }
-      value.value.spec.network.additionalNodeIngressRules = rules;
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const additionalTags = computed({
-  get: () => value?.value?.spec?.additionalTags || {},
-  set: (tags: {}) => {
-    if (value.value) {
-      set(value.value, 'spec.additionalTags', tags);
-    }
-    emit('update:value', value.value);
-  },
-});
-
-const cniIngressRules = computed({
-  get: () => value?.value?.spec?.network?.cni?.cniIngressRules || [],
-  set: (rules: any[]) => {
-    if (value.value) {
-      if (!value.value?.spec?.network) {
-        set(value.value, 'spec.network', {});
-      }
-      if (!value.value.spec.network.cni) {
-        value.value.spec.network.cni = {};
-      }
-      value.value.spec.network.cni.cniIngressRules = rules;
     }
     emit('update:value', value.value);
   },
@@ -279,7 +169,7 @@ function initDefaultRegion() {
   const region = value.value?.spec?.region || cloudCredential?.amazonec2credentialConfig?.defaultRegion || store.getters['aws/defaultRegion'];
 
   if (!value.value?.spec?.region) {
-    value.value.spec.region = region;
+    set(value.value, 'spec.region', region);
   }
 }
 
