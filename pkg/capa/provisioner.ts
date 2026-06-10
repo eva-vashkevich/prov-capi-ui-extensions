@@ -28,7 +28,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
     return async() => await createMachinePoolMachineConfig(this.machineConfigSchema, this.context);
   }
 
-  get saveMachinePoolConfigs(): (pools: any[], cluster: any) => Promise<any> {
+  get saveMachinePoolConfigs(): (pools: any[], cluster: any) => Promise<void> {
     return async(pools: any[], cluster: any) => await saveMachinePoolConfigs(pools, cluster, this.context);
   }
 
@@ -36,7 +36,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
     return async(value, infrastructureCluster, isEdit) => await saveInfrastructureCluster(value, infrastructureCluster, this.context, isEdit);
   }
 
-  get initInfrastructureCluster(): (value: any, infrastructureCluster: any) => Promise<void> {
+  get initInfrastructureCluster(): (value: any, infrastructureCluster: any) => Promise<InfrastructureClusterResource | {} | undefined> {
     const clusterSchemaType = this.clusterSchema?.id || AWS_CLUSTER_SCHEMA;
 
     return async(value) => await initInfrastructureCluster(value, clusterSchemaType, this.context);

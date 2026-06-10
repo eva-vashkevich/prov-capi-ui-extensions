@@ -21,7 +21,7 @@ spec:
       - --v=5
       - --cloud-provider=aws`;
 
-function formatErrorMessage(context: StoreContext, key: string, e: unknown): string {
+function formatErrorMessage(context: StoreContext, key: string, e: any): string {
   const error = e instanceof Error || e?.message ? e.message : String(e);
   const t = context.t || context.$t
   return t ? t(key, { error }) : `${ key }: ${ error }`;
