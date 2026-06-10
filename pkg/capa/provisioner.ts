@@ -1,7 +1,7 @@
 import { IClusterProvisioner, ClusterProvisionerContext } from '@shell/core/types';
 import { mapDriver } from '@shell/store/plugins';
 import { createMachinePoolMachineConfig, initInfrastructureCluster, saveMachinePoolConfigs, saveInfrastructureCluster, updateProvCluster } from './utils';
-import { AWS_CLUSTER_SCHEMA, AWS_MACHINE_TEMPLATE_SCHEMA } from './types/capa';
+import { AWS_CLUSTER_SCHEMA, AWS_MACHINE_TEMPLATE_SCHEMA, InfrastructureClusterResource } from './types/capa';
 import ClusterConfiguration from './components/ClusterConfiguration.vue';
 import { isProviderEnabled } from "@shell/utils/settings";
 

@@ -2,9 +2,9 @@ import type { ClusterProvisionerContext } from '@shell/core/types';
 
 export const AWS_MACHINE_TEMPLATE_SCHEMA = 'infrastructure.cluster.x-k8s.io.awsmachinetemplate';
 export const AWS_CLUSTER_SCHEMA = 'infrastructure.cluster.x-k8s.io.awscluster';
-export type Translator = (key: string, args?: Record<string, string>) => string;
-
+export type Translator = (key: string, args?: Record<string, any>) => string;
 export type StringMap = Record<string, string>;
+
 export interface ResourceMetadata {
   name?: string;
   namespace?: string;
@@ -66,4 +66,7 @@ export interface PoolEntry {
 export interface MachineConfigSchema {
   id?: string;
 }
-export type StoreContext = Pick<ClusterProvisionerContext, 'dispatch' | 'getters' | 't'> & { $t?: Translator };
+export type StoreContext = Pick<ClusterProvisionerContext, 'dispatch' | 'getters'> & {
+  t?: Translator;
+  $t?: Translator;
+};
