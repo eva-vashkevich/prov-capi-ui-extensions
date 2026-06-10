@@ -10,7 +10,7 @@ export default function(plugin: IExtension): void {
   // Provide plugin metadata from package.json
   plugin.metadata = require('./package.json');
 
-// Register custom provisioner object
+  // Register custom provisioner object
   plugin.register('provisioner', CAPAProvisioner.ID, CAPAProvisioner);
 
   // Built-in icon

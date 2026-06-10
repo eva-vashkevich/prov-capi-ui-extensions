@@ -1,6 +1,6 @@
 import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
-import { AWS_MACHINE_TEMPLATE_SCHEMA } from './types/capa';
+import { AWS_MACHINE_TEMPLATE_SCHEMA, Translator, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext } from './types/capa';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -21,16 +21,14 @@ spec:
       - --v=5
       - --cloud-provider=aws`;
 
-type Translator = (key: string, args?: Record<string, string>) => string;
-
-function formatErrorMessage(t: Translator | undefined, key: string, e: unknown): string {
-  const error = e instanceof Error ? e.message : String(e);
-
+function formatErrorMessage(context: StoreContext, key: string, e: unknown): string {
+  const error = e instanceof Error || e?.message ? e.message : String(e);
+  const t = context.t || context.$t
   return t ? t(key, { error }) : `${ key }: ${ error }`;
 }
 
-export async function initInfrastructureCluster(value: any, clusterSchema: string, context: any): Promise<void> {
-  let config;
+export async function initInfrastructureCluster(value: ClusterValue, clusterSchema: string, context: StoreContext): Promise<InfrastructureClusterResource | {} | undefined> {
+  let config: InfrastructureClusterResource | undefined;
   let configMissing = false;
 
   if (!clusterSchema) {
@@ -46,13 +44,13 @@ export async function initInfrastructureCluster(value: any, clusterSchema: strin
         config = await context.dispatch('management/find', {
           type: clusterSchema,
           id:   `${ infraRef.namespace }/${ infraRef.name }`,
-        });
+        }) as InfrastructureClusterResource | undefined;
         // label-based fallback
       } else if (value.metadata?.name) {
         config = await context.dispatch('management/find', {
           type:     clusterSchema,
           selector: `cluster.x-k8s.io/cluster-name=${ value.metadata.name }`,
-        });
+        }) as InfrastructureClusterResource | undefined;
       }
 
       if (!config) {
@@ -66,10 +64,10 @@ export async function initInfrastructureCluster(value: any, clusterSchema: strin
         config = await context.dispatch('management/createPopulated', {
           type:     clusterSchema,
           metadata: { namespace: DEFAULT_WORKSPACE }
-        });
+        }) as InfrastructureClusterResource;
       } catch (e) {
 
-        throw new Error(formatErrorMessage(context.t, 'capa.errors.creatingInfrastructureClusterConfig', e));
+        throw new Error(formatErrorMessage(context, 'capa.errors.creatingInfrastructureClusterConfig', e));
       }
     }
 
@@ -78,24 +76,24 @@ export async function initInfrastructureCluster(value: any, clusterSchema: strin
   }
 }
 
-export async function createMachinePoolMachineConfig(machineConfigSchema: any, context: any){
+export async function createMachinePoolMachineConfig(machineConfigSchema: MachineConfigSchema | undefined, context: StoreContext): Promise<InfrastructureClusterResource | Record<string, never>> {
   const machineConfigType = machineConfigSchema?.id || AWS_MACHINE_TEMPLATE_SCHEMA;
-
   await context.dispatch('management/waitForSchema', { type: machineConfigType });
 
   const createConfig = await context.dispatch('management/createPopulated', {
-    type:     AWS_MACHINE_TEMPLATE_SCHEMA,
+    type:     machineConfigType,
     metadata: { namespace: DEFAULT_WORKSPACE }
-  });
+  }) as InfrastructureClusterResource | undefined;
 
   const config = createConfig || {};
 
   // TODO apply some defaults
   return config;
-};
+}
 
-export async function saveMachinePoolConfigs(pools: any[], cluster: any, context: any) {
-  const finalPools = [];
+export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: ClusterValue, context: StoreContext): Promise<void> {
+  const finalPools: MachinePool[] = [];
+  const clusterName = cluster.metadata?.name || 'cluster';
 
   for (const entry of pools) {
     if (entry.remove) {
@@ -103,10 +101,10 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, context
     }
 
     entry.pool.name = normalizeName(entry.pool.name) || 'pool';
-    const prefix = `${ cluster.metadata.name }-${ entry.pool.name }`;
+    const prefix = `${ clusterName }-${ entry.pool.name }`;
 
-    const prefixFormatted = prefix.substr(0, 50).toLowerCase();
-    try{
+    const prefixFormatted = prefix.slice(0, 50).toLowerCase();
+    try {
       if (entry.create) {
         if (!entry.config.metadata?.name) {
           entry.config.metadata.generateName = `nc-${ prefixFormatted }-`;
@@ -118,7 +116,6 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, context
         entry.pool.machineConfigRef.name = neu.metadata.name;
         entry.create = false;
         entry.update = true;
-        entry.config.spec.template.spec.additionalTags = { created: 'created' };
 
       } else if (entry.update) {
         // Upstream CAPI machine templates are immutable: create a replacement resource
@@ -126,7 +123,7 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, context
         const oldConfig = entry.config;
 
         // Clone before mutating so oldConfig retains its identity (links/id) for removal.
-        const newConfig = await context.dispatch('management/clone', { resource: oldConfig });
+        const newConfig = await context.dispatch('management/clone', { resource: oldConfig }) as InfrastructureClusterResource;
 
         delete newConfig.id;
         delete newConfig.metadata.name;
@@ -134,7 +131,6 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, context
         delete newConfig.metadata.uid;
         delete newConfig.links;
         newConfig.metadata.generateName = `nc-${ prefixFormatted }-`;
-        newConfig.spec.template.spec.instanceType = 't3.large';
 
         const neu = await newConfig.save();
 
@@ -142,23 +138,27 @@ export async function saveMachinePoolConfigs(pools: any[], cluster: any, context
         entry.pool.machineConfigRef.name = neu.metadata.name;
 
         try {
-          await oldConfig.remove();
+          if (oldConfig.remove) {
+            await oldConfig.remove();
+          }
         } catch (e) {
-          throw new Error(formatErrorMessage(context.t, 'capa.errors.removingOldMachineConfig', e));
+          throw new Error(formatErrorMessage(context, 'capa.errors.removingOldMachineConfig', e));
       
         }
       }
-    } catch(e) {
-      throw new Error(formatErrorMessage(context.t, 'capa.errors.savingMachineConfig', e));
+    } catch (e) {
+      throw new Error(formatErrorMessage(context, 'capa.errors.savingMachineConfig', e));
     }
 
     finalPools.push(entry.pool);
   }
-
+  if(!cluster.spec.rkeConfig) {
+    cluster.spec.rkeConfig = {};
+  }
   cluster.spec.rkeConfig.machinePools = finalPools;
 }
 
-export async function saveInfrastructureCluster(value: any, infrastructureCluster: any, context: any, isEdit = false): Promise<void> {
+export async function saveInfrastructureCluster(value: ClusterValue, infrastructureCluster: InfrastructureClusterResource | null, context: StoreContext, isEdit = false): Promise<void> {
   if (!infrastructureCluster) {
     return;
   }
@@ -185,16 +185,19 @@ export async function saveInfrastructureCluster(value: any, infrastructureCluste
       value.spec.rkeConfig.infrastructureRef = {
         kind:       'AWSCluster',
         name:       infraCluster.metadata.name,
-        namespace:  DEFAULT_WORKSPACE,
+        namespace:  infraCluster.metadata.namespace,
         apiVersion: 'infrastructure.cluster.x-k8s.io/v1beta2',
       };
     }
   } catch (e) {
-    throw new Error(formatErrorMessage(context.t, 'capa.errors.savingInfrastructureCluster', e));
+    throw new Error(formatErrorMessage(context, 'capa.errors.savingInfrastructureCluster', e));
   }
 }
 
-export async function updateProvCluster(value: any): Promise<void> {
+export async function updateProvCluster(value: ClusterValue): Promise<void> {
+  value.spec = value.spec || {};
+  value.spec.rkeConfig = value.spec.rkeConfig || {};
+
   if (!value?.spec?.rkeConfig?.additionalManifest) {
     value.spec.rkeConfig.additionalManifest = ADDITIONAL_MANIFEST;
   }
@@ -219,7 +222,7 @@ export function removeEmptyFields(input: any): any {
   }
 
   if (input && typeof input === 'object') {
-    const cleanedObject = Object.entries(input).reduce((acc: Record<string, any>, [key, val]) => {
+    const cleanedObject = Object.entries(input as Record<string, unknown>).reduce((acc: Record<string, unknown>, [key, val]) => {
       const cleanedValue = removeEmptyFields(val);
 
       if (cleanedValue !== undefined) {

@@ -9,7 +9,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
   static ID = 'awsmachinetemplate';
 
   constructor(private context: ClusterProvisionerContext) {
-    mapDriver(this.id, 'aws' );
+    mapDriver(this.id, 'aws');
   }
 
   get id(): string {
@@ -37,7 +37,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
   }
 
   get initInfrastructureCluster(): (value: any, infrastructureCluster: any) => Promise<void> {
-    const clusterSchemaType = this.clusterSchema?.id || this.clusterSchema;
+    const clusterSchemaType = this.clusterSchema?.id || AWS_CLUSTER_SCHEMA;
 
     return async(value) => await initInfrastructureCluster(value, clusterSchemaType, this.context);
   }
