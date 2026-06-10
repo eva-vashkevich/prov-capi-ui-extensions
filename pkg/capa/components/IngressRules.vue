@@ -8,8 +8,9 @@ import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
 import RcSection from '@components/RcSection/RcSection.vue';
 import RcSectionActions from '@components/RcSection/RcSectionActions.vue';
 import { useI18n } from '@shell/composables/useI18n';
-import ipaddr from 'ipaddr.js';
 import { removeEmptyFields } from '../utils';
+import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
+import * as validators from '../validators';
 import Checkbox from '@components/Form/Checkbox/Checkbox.vue';
 
 defineOptions({ name: 'IngressRules' });
@@ -48,13 +49,7 @@ const securityGroupInfo = ref<AWS.SecurityGroup[]>([]);
 const loadingSecurityGroups = ref(false);
 const { t } = useI18n(store);
 
-// TODO nb shared export
-const SECURITY_GROUP_ROLES = [
-  { label: 'node', value: 'node' },
-  { label: 'controlplane', value: 'controlplane' },
-  { label: 'apiserver-lb', value: 'apiserver-lb' },
-  { label: 'lb', value: 'lb' }
-];
+const SECURITY_GROUP_ROLE_OPTIONS = computed(() => SECURITY_GROUP_ROLES.map((r) => ({ label: t(`capa.clusterConfig.network.securityGroups.roles.${ r }`), value: r })));
 
 const PROTOCOLS = computed(() => [
   { label: t('capa.clusterConfig.network.ingressRules.protocols.all'), value: '-1' },
@@ -215,15 +210,16 @@ function allowSecurityGroupRoles({ cidrBlocks = [], sourceSecurityGroupRoles = [
   return !cidrBlocks.length || sourceSecurityGroupRoles.length;
 }
 
-// TODO nb shared validator function
 function validateCidrString(cidrBlockString = '') {
-  const cidrBlocks = getCidrArray(cidrBlockString) || [];
+  const blocks = getCidrArray(cidrBlockString);
 
-  try {
-    return !!cidrBlocks.find((cidr) => !ipaddr.isValidCIDR(cidr)) ? 'Invalid CIDR format' : null;
-  } catch {
-    return 'Invalid CIDR format';
-  }
+  return validators.ipv4CidrBlocks(t, blocks);
+}
+
+function validateIpv6CidrString(cidrBlockString = '') {
+  const blocks = getCidrArray(cidrBlockString);
+
+  return validators.ipv6CidrBlocks(t, blocks);
 }
 
 watch([
@@ -347,7 +343,7 @@ watch([
               :disabled="!allowSecurityGroupRoles(rule)"
               :value="rule.sourceSecurityGroupRoles || []"
               :mode="mode"
-              :options="SECURITY_GROUP_ROLES"
+              :options="SECURITY_GROUP_ROLE_OPTIONS"
               :multiple="true"
               @update:value="updateRule(index, 'sourceSecurityGroupRoles', $event)"
             />
@@ -390,6 +386,7 @@ watch([
               :disabled="!allowCidr(rule)"
               :value="getLocalIpv6CidrValue(index, rule.ipv6CidrBlocks)"
               :mode="mode"
+              :rules="[validateIpv6CidrString]"
               :placeholder="t('capa.clusterConfig.network.ingressRules.ipv6CidrBlocksPlaceholder')"
               @update:value="handleIpv6CidrInput(index, $event)"
               @blur="updateIpv6CidrFromLocalValue(index)"

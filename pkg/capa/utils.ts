@@ -1,10 +1,10 @@
 import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
-import {
-  AWS_MACHINE_TEMPLATE_SCHEMA, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext
-} from './types/capa';
 import { set } from '@shell/utils/object';
 import { createDoNotLogError } from '@shell/utils/error';
+import { AWS_MACHINE_TEMPLATE_SCHEMA, Translator, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext } from './types/capa';
+import * as AWS from '@shell/types/aws-sdk';
+import { CAPA } from './labels-annotations';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -246,4 +246,10 @@ export function removeEmptyFields(input: any): any {
   }
 
   return input;
+}
+
+export function isCapaManagedVpcId(vpcId = '', vpcs = [] as AWS.VPC[]) {
+  const vpc = vpcs.find((v) => v?.VpcId === vpcId);
+
+  return !(vpc?.Tags || [])?.some((tag) => (tag.Key || '').startsWith(CAPA.CAPA_CLUSTER_PREFIX));
 }

@@ -167,6 +167,24 @@ watch(useUnmanagedNetwork, (neu) => {
   }
 });
 
+watch(vpcId, () => {
+  emit('update:subnets', []);
+  const cpRules = (additionalControlPlaneIngressRules.value || []).map((r: any) => {
+    const { sourceSecurityGroupIDs, ...rest } = r;
+
+    return sourceSecurityGroupIDs ? rest : r;
+  });
+
+  emit('update:additionalControlPlaneIngressRules', cpRules);
+  const nodeRules = (additionalNodeIngressRules.value || []).map((r: any) => {
+    const { sourceSecurityGroupIDs, ...rest } = r;
+
+    return sourceSecurityGroupIDs ? rest : r;
+  });
+
+  emit('update:additionalNodeIngressRules', nodeRules);
+});
+
 watch(vpcOptions, () => {
   // if users select 'managed networks' the UI will leave vpcId empty and CAPA will populate vpcId
   // on edit, we have to look at the VPC definition to see if its was created by CAPA to know if UI should show 'managed networks' or 'unmanaged networks' selected
@@ -216,10 +234,9 @@ watch(allowCNIRules, (allowed) => {
     @update:value="$emit('update:useUnmanagedNetwork', $event)"
   />
 
-  <!-- TODO nb add localization -->
   <RcSection
     v-if="useUnmanagedNetwork"
-    title="Unmanaged Network Settings"
+    :title="t('capa.clusterConfig.network.unmanagedSettings.title')"
     type="secondary"
     mode="with-header"
     :expandable="true"
@@ -267,15 +284,14 @@ watch(allowCNIRules, (allowed) => {
     </div>
   </div>
   <div class="row">
-    <!-- TODO nb localization -->
     <Checkbox
       v-model:value="enableIpv6"
       :mode="mode"
-      label="Enable IPv6"
+      :label="t('capa.clusterConfig.network.enableIpv6')"
     />
   </div>
   <RcSection
-    title="Network Security"
+    :title="t('capa.clusterConfig.network.networkSecurity.title')"
     :expandable="true"
     mode="with-header"
     type="secondary"
@@ -328,7 +344,7 @@ watch(allowCNIRules, (allowed) => {
         color="info"
         class="override-info-banner"
       >
-        The control plane security group has been manually overriden with an existing security group. Additional ingress rules can only be applied to security groups managed by CAPA.
+        {{ t('capa.clusterConfig.network.overrideBanners.controlPlaneOverridden') }}
       </Banner>
     </RcSection>
 
@@ -355,7 +371,7 @@ watch(allowCNIRules, (allowed) => {
         color="info"
         class="override-info-banner"
       >
-        The node security group has been manually overriden with an existing security group. Additional ingress rules can only be applied to the security groups created and managed by CAPA.
+        {{ t('capa.clusterConfig.network.overrideBanners.nodeOverridden') }}
       </Banner>
     </RcSection>
 
@@ -370,14 +386,14 @@ watch(allowCNIRules, (allowed) => {
         color="info"
         class="override-info-banner"
       >
-        The node security group has been manually overriden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the control plane security group that CAPA will create.
+        {{ t('capa.clusterConfig.network.overrideBanners.nodeOverriddenCni') }}
       </Banner>
       <Banner
         v-if="!allowAdditionalCPRules && allowCNIRules"
         color="info"
         class="override-info-banner"
       >
-        The control plane security group has been manually overriden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the node security group that CAPA will create.
+        {{ t('capa.clusterConfig.network.overrideBanners.controlPlaneOverriddenCni') }}
       </Banner>
       <h5>{{ t('capa.clusterConfig.network.cniIngressRules.description') }}</h5>
       <IngressRules
@@ -396,14 +412,13 @@ watch(allowCNIRules, (allowed) => {
         color="info"
         class="override-info-banner"
       >
-        Both node and control plane security groups have been overriden with existing security groups. CNI ingress rules can only be applied to security groups managed by CAPA
+        {{ t('capa.clusterConfig.network.overrideBanners.bothOverridden') }}
       </Banner>
     </RcSection>
   </RcSection>
 </template>
 
 <style lang="scss" scoped>
-  /* //TODO nb do this elsewhere? banner style of 15px margin top and bottom looks off in rcsection component */
   .banner.override-info-banner {
     margin: 0px;
   }

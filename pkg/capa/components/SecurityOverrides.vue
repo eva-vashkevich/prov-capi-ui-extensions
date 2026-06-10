@@ -12,20 +12,7 @@ import KeyValue from '@shell/components/form/KeyValue.vue';
 import ButtonDropdown from '@shell/components/ButtonDropdown.vue';
 import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
 import Select from '@shell/components/form/Select.vue';
-
-const SECURITY_GROUP_ROLES = [
-  // Kubernetes workload node role
-  'node',
-
-  // Kubernetes control plane node role
-  'controlplane',
-
-  // Kubernetes API Server Load Balancer role
-  'apiserver-lb',
-
-  // container for the cloud provider to inject its load balancer ingress rules
-  'lb'
-];
+import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
 
 defineOptions({ name: 'SecurityGroupOverrides' });
 
@@ -109,7 +96,7 @@ async function getSecurityGroups() {
 
     return;
   }
-  // TODO nb store method with caching
+  
   const securityGroups = await ec2Client.value.describeSecurityGroups({ });
 
   securityGroupInfo.value = securityGroups?.SecurityGroups || [];

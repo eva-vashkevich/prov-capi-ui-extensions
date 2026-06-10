@@ -4,7 +4,7 @@ import {
 } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from '@shell/composables/useI18n';
-import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
+import LabeledSelect from '@shell/components/form/LabeledSelect';
 import { RcSection } from '@components/RcSection';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
@@ -12,10 +12,10 @@ import Networking from './Networking.vue';
 import { removeEmptyFields } from '../utils';
 import { NORMAN } from '@shell/config/types';
 import { isEmpty, set } from '@shell/utils/object.js';
-import KeyValue from '@shell/components/form/KeyValue.vue';
+import KeyValue from '@shell/components/form/KeyValue';
 import * as AWS from '@shell/types/aws-sdk';
 import { useForm } from 'vee-validate';
-import ipaddr from 'ipaddr.js';
+import * as validators from '../validators';
 
 defineOptions({ name: 'ClusterConfiguration' });
 
@@ -88,62 +88,17 @@ const loadingVpcs = ref(false);
 const loadingSubnets = ref(false);
 
 const validateIngressRulesCidr = (additionalRules = []) => {
-  try {
-    const invalidCidr = additionalRules.find((r = {}) => {
-      const { cidrBlocks = [] } = r;
-
-      return cidrBlocks.find((cidr) => !ipaddr.isValidCIDR(cidr));
-    });
-
-    return invalidCidr ? 'Invalid CIDR format' : true;
-  } catch {
-    return 'Invalid CIDR format';
-  }
+  return validators.validateIngressRulesCidr(t, additionalRules);
 };
 
-// TODO nb localize error messages
-const { errors, validate, validateField } = useForm({
+const { errors } = useForm({
   validationSchema: {
-    vpc: (val: string) => {
-      if (!useUnmanagedNetwork.value) {
-        return true;
-      }
-
-      return val && val !== '' ? true : 'VPC is required';
-    },
-
-    subnet: (val: string[]) => {
-      if (!useUnmanagedNetwork.value) {
-        return true;
-      }
-
-      return val && val.length > 0 ? true : 'At least one subnet is required';
-    },
-
-    cidrBlock: (val: string) => {
-      if (useUnmanagedNetwork.value || !val) {
-        return true;
-      }
-      let isValid = false;
-
-      try {
-        isValid = ipaddr.isValidCIDR(val);
-      } catch {
-        return 'Invalid CIDR format';
-      }
-
-      return isValid ?? 'Invalid CIDR format';
-    },
-
-    region: (val: string) => {
-      return val && val !== '' ? true : 'Region is required';
-    },
-
-    nodeIngressCidr: () => validateIngressRulesCidr(additionalNodeIngressRules.value),
-
-    cpIngressCidr: () => validateIngressRulesCidr(additionalControlPlaneIngressRules.value),
-
-    cniIngressCidr: () => validateIngressRulesCidr(cniIngressRules.value),
+    vpc:    (val: string) => validators.vpc(t, val, useUnmanagedNetwork.value),
+    subnet: (val: string[]) => validators.subnet(t, val, useUnmanagedNetwork.value),
+    cidrBlock: (val: string) => validators.cidrBlock(t, val, useUnmanagedNetwork.value),
+    region: (val: string) => validators.region(t, val),
+    nodeIngressCidr: () => validators.validateIngressRulesCidr(t, additionalNodeIngressRules.value),
+    cpIngressCidr: () => validators.validateIngressRulesCidr(t, additionalControlPlaneIngressRules.value),
   }
 });
 
@@ -319,7 +274,7 @@ function initDefaultRegion() {
   try {
     cloudCredential = credentialId.value ? store.getters['rancher/byId']( NORMAN.CLOUD_CREDENTIAL, credentialId.value ) : {};
   } catch {
-    // TODO nb cant load default region?
+    // can't load region from credential, oh well: load the default region from the aws store
   }
   const region = value.value?.spec?.region || cloudCredential?.amazonec2credentialConfig?.defaultRegion || store.getters['aws/defaultRegion'];
 
@@ -330,7 +285,6 @@ function initDefaultRegion() {
 
 async function getRegions() {
   loadingRegions.value = true;
-  // TODO get regions based on credentials
   if (!ec2Client.value || !region.value || !credentialId.value) {
     regionInfo.value = [];
 
@@ -351,7 +305,6 @@ async function getSshKeys() {
     return;
   }
 
-  // TODO nb does this work
   const keys = await ec2Client.value.describeKeyPairs({});
 
   sshKeyInfo.value = keys.KeyPairs || [];
@@ -368,8 +321,7 @@ async function getVpcs() {
     return;
   }
 
-  //TODO nb no custom store method
-  const vpcs = await store.dispatch('aws/describeVpcs', { client: ec2Client.value });
+  const vpcs = await store.dispatch('aws/depaginateList', { client: ec2Client.value, cmd: 'describeVpcs' });
 
   vpcInfo.value = vpcs || [];
   loadingVpcs.value = false;
@@ -384,8 +336,7 @@ async function getSubnets() {
     return;
   }
 
-  //TODO nb no custom store method
-  const fetchedSubnets = await store.dispatch('aws/describeSubnets', { client: ec2Client.value });
+  const fetchedSubnets = await store.dispatch('aws/depaginateList', { client: ec2Client.value, cmd: 'describeSubnets' });
 
   subnetInfo.value = fetchedSubnets || [];
   loadingSubnets.value = false;
@@ -403,8 +354,6 @@ onMounted(async() => {
   getVpcs();
   getSubnets();
 
-  // TODO nb remove non-required field
-  // TODO nb need to be very careful about removing 'empty' fields - does empty object get removed? empty array? should empty string be removed?
   if (mode.value === _CREATE) {
     const valueWithDefaults = merge({}, defaultConfig, value.value);
     const cleanedValueWithDefaults = removeEmptyFields(valueWithDefaults);
@@ -423,22 +372,6 @@ watch(useUnmanagedNetwork, (neu, old) => {
   if (old && !neu) {
     securityGroupOverrides.value = {};
   }
-});
-
-// secuirtyGroupoverrides cleared in their component
-// TODO nb clear all of these in their respective components?
-watch(vpcId, () => {
-  subnets.value = [];
-  additionalControlPlaneIngressRules.value.forEach((r: any) => {
-    if (r.sourceSecurityGroupIDs) {
-      delete r.sourceSecurityGroupIDs;
-    }
-  });
-  additionalNodeIngressRules.value.forEach((r: any) => {
-    if (r.sourceSecurityGroupIDs) {
-      delete r.sourceSecurityGroupIDs;
-    }
-  });
 });
 
 watch([
@@ -477,7 +410,7 @@ watch([
       type="primary"
     >
       <RcSection
-        title="General Configuration"
+        :title="t('capa.clusterConfig.generalConfiguration.title')"
         :expandable="true"
         mode="with-header"
         type="secondary"

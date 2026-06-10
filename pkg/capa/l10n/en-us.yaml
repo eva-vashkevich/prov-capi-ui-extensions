@@ -4,6 +4,8 @@ capa:
   label: CAPI AWS
   clusterConfig:
       title: CAPI Cluster Configuration
+      generalConfiguration:
+        title: General Configuration
       region:
         label: Region
         placeholder: Select a region
@@ -19,6 +21,17 @@ capa:
           unmanaged: 
             label: Unmanaged network (manual configuration)
             description: Bring your own AWS Instrastructure. Select an existing VPC and Subnets. By default, CAPA will still create Security Groups and a Control Plane Load Balancer.
+        unmanagedSettings:
+          title: Unmanaged Network Settings
+        enableIpv6: Enable IPv6
+        networkSecurity:
+          title: Network Security
+        overrideBanners:
+          controlPlaneOverridden: The control plane security group has been manually overridden with an existing security group. Additional ingress rules can only be applied to security groups managed by CAPA.
+          nodeOverridden: The node security group has been manually overridden with an existing security group. Additional ingress rules can only be applied to the security groups created and managed by CAPA.
+          nodeOverriddenCni: The node security group has been manually overridden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the control plane security group that CAPA will create.
+          controlPlaneOverriddenCni: The control plane security group has been manually overridden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the node security group that CAPA will create.
+          bothOverridden: Both node and control plane security groups have been overridden with existing security groups. CNI ingress rules can only be applied to security groups managed by CAPA.
         vpc:
           label: VPC
           description: VPC to use with your cluster resources.
@@ -168,8 +181,12 @@ cluster:
   #TODO nb should this be under errors instead
   validation:
     regionRequired: Region is required.
+    vpcRequired: VPC is required
+    subnetRequired: At least one subnet is required
+    invalidCidr: Invalid CIDR format
+    invalidIpv4Cidr: Invalid IPv4 CIDR format
+    invalidIpv6Cidr: Invalid IPv6 CIDR format
     vpcCidrBlock: VPC CIDR block must be a valid IPv4 CIDR (e.g., 10.0.0.0/16).
-    vpcCidrBlockIpv6: VPC CIDR block must be a valid IPv4 or IPv6 CIDR.
     vpcIdRequired: A VPC must be selected when using an unmanaged network.
     subnetsRequired: At least one subnet must be selected when using an unmanaged network.
     ingressCidrBlocks: '"{value}" is not a valid IPv4 CIDR block.'
