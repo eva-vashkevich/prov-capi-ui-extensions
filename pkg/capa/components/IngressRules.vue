@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toRefs, computed, ref, watch } from 'vue';
+import { toRefs, computed, ref } from 'vue';
 import { _CREATE } from '@shell/config/query-params';
 import { useStore } from 'vuex';
 import * as AWS from '@shell/types/aws-sdk';
@@ -20,33 +20,30 @@ const emit = defineEmits(['update:value']);
 interface Props {
   value: any[];
   mode?: string;
-  region?: string;
-  credentialId?: any;
   vpcId?: string;
+  securityGroupInfo?: AWS.SecurityGroup[];
+  loadingSecurityGroups?: boolean;
   allowTargets?: boolean;
   titlePrefix?: string;
   disableAdd?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  mode:         _CREATE,
-  value:        () => [],
-  region:       '',
-  credentialId: null,
-  vpcId:        '',
-  allowTargets: true,
-  titlePrefix:  '',
-  disableAdd:   false
+  mode:                  _CREATE,
+  value:                 () => [],
+  vpcId:                 '',
+  securityGroupInfo:     () => [],
+  loadingSecurityGroups: false,
+  allowTargets:          true,
+  titlePrefix:           '',
+  disableAdd:            false
 });
 
 const {
-  value, mode, region, credentialId, vpcId, allowTargets
+  value, mode, vpcId, securityGroupInfo, loadingSecurityGroups, allowTargets
 } = toRefs(props);
 
 const store = useStore();
-const ec2Client = ref(null);
-const securityGroupInfo = ref<AWS.SecurityGroup[]>([]);
-const loadingSecurityGroups = ref(false);
 const { t } = useI18n(store);
 
 const SECURITY_GROUP_ROLE_OPTIONS = computed(() => SECURITY_GROUP_ROLES.map((r) => ({ label: t(`capa.clusterConfig.network.securityGroups.roles.${ r }`), value: r })));
@@ -95,22 +92,6 @@ const securityGroupOptions = computed(() => {
     return opts;
   }, [] as any);
 });
-
-async function getSecurityGroups() {
-  loadingSecurityGroups.value = true;
-
-  if (!ec2Client.value) {
-    securityGroupInfo.value = [];
-    loadingSecurityGroups.value = false;
-
-    return;
-  }
-
-  const securityGroups = await ec2Client.value.describeSecurityGroups({ });
-
-  securityGroupInfo.value = securityGroups?.SecurityGroups || [];
-  loadingSecurityGroups.value = false;
-}
 
 function addRule() {
   const rules = [...localValue.value];
@@ -221,22 +202,6 @@ function validateIpv6CidrString(cidrBlockString = '') {
 
   return validators.ipv6CidrBlocks(t, blocks);
 }
-
-watch([
-  () => region.value,
-  () => credentialId.value,
-], async([newRegion, newCredentialId]) => {
-  if (!!newRegion && !!newCredentialId) {
-    ec2Client.value = await store.dispatch('aws/ec2', {
-      region:            region.value,
-      cloudCredentialId: credentialId.value
-    });
-
-    getSecurityGroups();
-  } else {
-    securityGroupInfo.value = [];
-  }
-}, { immediate: true });
 </script>
 
 <template>

@@ -11,7 +11,6 @@ import { useI18n } from '@shell/composables/useI18n';
 import KeyValue from '@shell/components/form/KeyValue.vue';
 import ButtonDropdown from '@shell/components/ButtonDropdown.vue';
 import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
-import Select from '@shell/components/form/Select.vue';
 import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
 
 defineOptions({ name: 'SecurityGroupOverrides' });
@@ -25,24 +24,22 @@ interface Props {
   // TODO nb type as map
   value: any;
   mode?: string;
-  credentialId: any;
-  region?: string;
+  securityGroupInfo?: AWS.SecurityGroup[];
+  loadingSecurityGroups?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  mode:   _CREATE,
-  region: ''
+  mode:                  _CREATE,
+  securityGroupInfo:     () => [],
+  loadingSecurityGroups: false,
 });
 
 const {
-  vpcId, value, credentialId, region
+  vpcId, value, securityGroupInfo, loadingSecurityGroups
 } = toRefs(props);
 
 const store = useStore();
 const { t } = useI18n(store);
-const securityGroupInfo = ref<AWS.SecurityGroup[]>([]);
-const loadingSecurityGroups = ref(false);
-const ec2Client = ref(null);
 const localValue = ref({ ...value.value });
 let updatingFromProp = false;
 
@@ -87,25 +84,7 @@ function updateRowValue(key: string, newValue: string) {
   };
 }
 
-async function getSecurityGroups() {
-  loadingSecurityGroups.value = true;
-
-  if (!ec2Client.value) {
-    securityGroupInfo.value = [];
-    loadingSecurityGroups.value = false;
-
-    return;
-  }
-  
-  const securityGroups = await ec2Client.value.describeSecurityGroups({ });
-
-  securityGroupInfo.value = securityGroups?.SecurityGroups || [];
-  loadingSecurityGroups.value = false;
-}
-
 function addOverride(targetRole: string) {
-  // const next = securityGroupRoleOptions?.value?.[0]?.value;
-
   // Create a new object to ensure reactivity triggers
   localValue.value = {
     ...localValue.value,
@@ -124,7 +103,6 @@ watch(vpcId, (neu, old) => {
       localValue.value[k] = '';
     });
   }
-  getSecurityGroups();
 });
 
 watch(value, (neu) => {
@@ -145,25 +123,10 @@ watch(localValue, (neu) => {
   emit('update:value', neu);
 });
 
-watch([
-  () => region.value,
-  () => credentialId.value,
-], async([newRegion, newCredentialId]) => {
-  if (!!newRegion && !!newCredentialId) {
-    ec2Client.value = await store.dispatch('aws/ec2', {
-      region:            region.value,
-      cloudCredentialId: credentialId.value
-    });
-
-    getSecurityGroups();
-  } else {
-    securityGroupInfo.value = [];
-  }
-}, { immediate: true });
-
 </script>
 
 <template>
+  <!-- //TODO nb fix styling in template - inputs too high and not sharing horizontal space correctly -->
   <div
     v-if="Object.keys(localValue || {}).length"
   >

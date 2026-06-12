@@ -195,3 +195,5 @@ cluster:
     fetchingSshKeys: "Error fetching SSH keys: {error}"
     fetchingVpcs: "Error fetching VPCs: {error}"
     fetchingSubnets: "Error fetching subnets: {error}"
+    fetchingSecurityGroups: "Error fetching security groups: {error}"
+    fetchingCloudCredential: "Error fetching Rancher Cloud Credential details: {error}"

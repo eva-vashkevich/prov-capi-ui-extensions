@@ -178,8 +178,7 @@ async function getCloudCredential(){
     initDefaultRegion()
     getIdentityRef()
   } catch (e){
-    //TODO nb localize
-    credentialErrors.value.push('Error fetching cloud credential details: ' + e)
+    credentialErrors.value.push(t('capa.errors.fetchingCloudCredential', { error: e }))
   }
 }
 
@@ -294,7 +293,7 @@ onMounted(async() => {
   if (mode.value === _CREATE) {
     const valueWithDefaults = merge({}, defaultConfig, value.value);
     const cleanedValueWithDefaults = removeEmptyFields(valueWithDefaults);
-    //TODO nb why this line
+    //TODO nb why this line - related to using createPopulated??
     delete cleanedValueWithDefaults.spec.s3Bucket;
 
     emit('update:value', cleanedValueWithDefaults || {});
@@ -305,8 +304,7 @@ onMounted(async() => {
 //validation errors are from useForm and reported in individual inputs
 // credential errors are errors getting credential or loading aws data, reported in error banner
 watch([validationErrors, credentialErrors], ([validationErrs={}, credErrs=[]]) => {
-  //TODO nb use localization string for that .includes
-  emit('validationChanged', isEmpty(validationErrs) && (!credErrs.length || !credErrs.find((e:string) =>e.includes('Error fetching cloud credential details'))));
+  emit('validationChanged', isEmpty(validationErrs) && (!credErrs.length || !credErrs.find((e:string) =>e.includes(t('capa.errors.fetchingCloudCredential', { error: '' })))));
 });
 
 watch(useUnmanagedNetwork, (neu, old) => {
@@ -320,8 +318,8 @@ watch([
   () => region.value,
   () => credentialId.value,
 ], async([newRegion, newCredentialId], [oldRegion, oldCredentialId]) => {
+    credentialErrors.value = []
     if(newCredentialId){
-      credentialErrors.value = []
       // need to await cloud cred as subsequent functions depend on it
       // the other get* functions are not awaited and loading props are used to display spinners in relevant inputs
       await getCloudCredential();
@@ -359,6 +357,7 @@ watch([
 <template>
   <div class="mb-20">
     <Banner v-for="e in credentialErrors" color="error">{{ e }}</Banner>
+    {{ value }}
     <RcSection
       :title="t('capa.clusterConfig.title')"
       :expandable="true"
