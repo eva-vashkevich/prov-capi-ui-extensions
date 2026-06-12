@@ -35,11 +35,9 @@ export async function prepareProvCluster(cluster: any, context: StoreContext): P
   if (!cluster?.spec?.rkeConfig?.additionalManifest) {
     set(cluster, 'spec.rkeConfig.additionalManifest', ADDITIONAL_MANIFEST);
   }
-  if (!cluster.agentConfig) {
-    cluster.agentConfig = {};
-  }
-  if (cluster.agentConfig['cloud-provider-name'] !== 'external') {
-    cluster.agentConfig['cloud-provider-name'] = 'external';
+
+  if (cluster?.agentConfig['cloud-provider-name'] !== 'external') {
+    set(cluster, 'agentConfig.cloud-provider-name', 'external');
   }
 }
 
