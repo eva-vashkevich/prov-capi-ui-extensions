@@ -4,7 +4,7 @@ import { Banner } from '@components/Banner';
 import CreateEditView from '@shell/mixins/create-edit-view';
 import { HTTP_TOKENS_VALUES } from './constants';
 import { NORMAN } from '@shell/config/types';
-import { exceptionToErrorsArray, formatAWSError } from '@shell/utils/error';
+import { exceptionToErrorsArray, formatAWSError, stringify } from '@shell/utils/error';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
 import { removeEmptyFields } from '../utils';

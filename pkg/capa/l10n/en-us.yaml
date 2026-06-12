@@ -52,7 +52,7 @@ capa:
         size:
           label: Root Disk Size
         type:
-          label: Volume type  
+          label: Volume type
       advanced:
         title: Additional volumes (non-root)
         additionalVolumes:

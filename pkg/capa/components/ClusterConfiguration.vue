@@ -135,7 +135,9 @@ onMounted(async() => {
   getRegions();
   const valueWithDefaults = merge({}, defaultConfig, value.value);
 
-  valueWithDefaults.spec.identityRef.name = identityRef;
+  if (identityRef) {
+     valueWithDefaults.spec.identityRef.name = identityRef;
+   }
 
   const cleanedValueWithDefaults = removeEmptyFields(valueWithDefaults);
 

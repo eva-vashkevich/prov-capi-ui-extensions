@@ -61,6 +61,8 @@ declare module '@shell/utils/error' {
   export function stringify(err: unknown): string;
   export function exceptionToErrorsArray(err: unknown): string[];
   export function formatAWSError(err: unknown): unknown;
+  export function createDoNotLogError(message: string): Error;
+  export function isDoNotLogError(err: unknown): boolean;
 }
 
 declare module '@shell/plugins/dashboard-store/actions' {
