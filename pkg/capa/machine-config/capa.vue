@@ -4,7 +4,7 @@ import { Banner } from '@components/Banner';
 import CreateEditView from '@shell/mixins/create-edit-view';
 import { HTTP_TOKENS_VALUES } from './constants';
 import { NORMAN } from '@shell/config/types';
-import { stringify, exceptionToErrorsArray, formatAWSError } from '@shell/utils/error';
+import { exceptionToErrorsArray, formatAWSError } from '@shell/utils/error';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
 import { removeEmptyFields } from '../utils';
@@ -13,27 +13,26 @@ const defaultConfig = {
   spec: {
     template: {
       spec: {
-        ami:                      { id: 'ami-0d13e2317a7e75c95' },
-        cloudInit:                { insecureSkipSecretsManager: true },
-        iamInstanceProfile:       'control-plane.cluster-api-provider-aws.sigs.k8s.io',
-        instanceMetadataOptions:  { httpTokens: HTTP_TOKENS_VALUES.REQUIRED },
-        instanceType:             't3.medium',
-        marketType:               'OnDemand',
-        publicIp:                 false,
-        rootVolume:               {
+        ami:                     { id: 'ami-0d13e2317a7e75c95' },
+        cloudInit:               { insecureSkipSecretsManager: true },
+        iamInstanceProfile:      'control-plane.cluster-api-provider-aws.sigs.k8s.io',
+        instanceMetadataOptions: { httpTokens: HTTP_TOKENS_VALUES.REQUIRED },
+        instanceType:            't3.medium',
+        marketType:              'OnDemand',
+        publicIp:                false,
+        rootVolume:              {
           encrypted: false, size: 30, type: 'gp3'
         },
-        sshKeyName:             'eva',
-        subnet:                 { id: 'subnet-02e4caf6f4ee75111' },
+        sshKeyName:     'eva',
+        subnet:         { id: 'subnet-02e4caf6f4ee75111' },
+        privateDnsName: { hostnameType: 'resource-name' }
       }
     }
   }
 };
 
 export default {
-  components: {
-    Banner, Loading
-  },
+  components: { Banner, Loading },
 
   mixins: [CreateEditView],
 

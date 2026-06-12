@@ -39,6 +39,7 @@ interface Props {
   mode: string;
   provider?: string;
   credentialId?: any;
+  provisioningCluster?: any;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -52,6 +53,7 @@ const {
   mode,
   value,
   credentialId,
+  provisioningCluster,
 } = toRefs(props);
 
 // Ensure spec is always present and reactive

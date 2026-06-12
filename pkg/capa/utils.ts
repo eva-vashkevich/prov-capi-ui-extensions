@@ -1,6 +1,10 @@
 import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
-import { AWS_MACHINE_TEMPLATE_SCHEMA, Translator, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext } from './types/capa';
+import {
+  AWS_MACHINE_TEMPLATE_SCHEMA, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext
+} from './types/capa';
+import { set } from '@shell/utils/object';
+import { createDoNotLogError } from '@shell/utils/error';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -23,8 +27,30 @@ spec:
 
 function formatErrorMessage(context: StoreContext, key: string, e: any): string {
   const error = e instanceof Error || e?.message ? e.message : String(e);
-  const t = context.t || context.$t
+  const t = context.t || context.$t;
+
   return t ? t(key, { error }) : `${ key }: ${ error }`;
+}
+export async function prepareProvCluster(cluster: any, context: StoreContext): Promise<void> {
+  if (!cluster?.spec?.rkeConfig?.additionalManifest) {
+    set(cluster, 'spec.rkeConfig.additionalManifest', ADDITIONAL_MANIFEST);
+  }
+  if (!cluster.agentConfig) {
+    cluster.agentConfig = {};
+  }
+  if (cluster.agentConfig['cloud-provider-name'] !== 'external') {
+    cluster.agentConfig['cloud-provider-name'] = 'external';
+  }
+}
+
+export function provisioningClusterValidation(cluster: any, context: StoreContext): void {
+  if (!cluster?.spec?.rkeConfig?.additionalManifest) {
+    throw createDoNotLogError(formatErrorMessage(context, 'capa.errors.missingAdditionalManifest'));
+  }
+
+  if (cluster.agentConfig?.['cloud-provider-name'] !== 'external') {
+    throw createDoNotLogError(formatErrorMessage(context, 'capa.errors.invalidCloudProviderName'));
+  }
 }
 
 export async function initInfrastructureCluster(value: ClusterValue, clusterSchema: string, context: StoreContext): Promise<InfrastructureClusterResource | {} | undefined> {
@@ -66,10 +92,10 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
           metadata: { namespace: DEFAULT_WORKSPACE }
         }) as InfrastructureClusterResource;
       } catch (e) {
-
         throw new Error(formatErrorMessage(context, 'capa.errors.creatingInfrastructureClusterConfig', e));
       }
     }
+    config.spec = removeEmptyFields(config.spec);
 
     // TODO handle case where config is still missing and make sure spec is setup correctly
     return config || {};
@@ -78,6 +104,7 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
 
 export async function createMachinePoolMachineConfig(machineConfigSchema: MachineConfigSchema | undefined, context: StoreContext): Promise<InfrastructureClusterResource | Record<string, never>> {
   const machineConfigType = machineConfigSchema?.id || AWS_MACHINE_TEMPLATE_SCHEMA;
+
   await context.dispatch('management/waitForSchema', { type: machineConfigType });
 
   const createConfig = await context.dispatch('management/createPopulated', {
@@ -104,6 +131,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
     const prefix = `${ clusterName }-${ entry.pool.name }`;
 
     const prefixFormatted = prefix.slice(0, 50).toLowerCase();
+
     try {
       if (entry.create) {
         if (!entry.config.metadata?.name) {
@@ -116,7 +144,6 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         entry.pool.machineConfigRef.name = neu.metadata.name;
         entry.create = false;
         entry.update = true;
-
       } else if (entry.update) {
         // Upstream CAPI machine templates are immutable: create a replacement resource
         // with the current spec values, update the pool reference, then remove the old one.
@@ -143,7 +170,6 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
           }
         } catch (e) {
           throw new Error(formatErrorMessage(context, 'capa.errors.removingOldMachineConfig', e));
-      
         }
       }
     } catch (e) {
@@ -152,7 +178,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
 
     finalPools.push(entry.pool);
   }
-  if(!cluster.spec.rkeConfig) {
+  if (!cluster.spec.rkeConfig) {
     cluster.spec.rkeConfig = {};
   }
   cluster.spec.rkeConfig.machinePools = finalPools;
@@ -171,8 +197,6 @@ export async function saveInfrastructureCluster(value: ClusterValue, infrastruct
     } else {
       infrastructureCluster.metadata.name = value.metadata.name;
     }
-  } else {
-    infrastructureCluster.spec.additionalTags = { updated: 'updated' };
   }
   try {
     const infraCluster = await infrastructureCluster.save();
@@ -182,33 +206,15 @@ export async function saveInfrastructureCluster(value: ClusterValue, infrastruct
         value.spec.rkeConfig = {};
       }
 
-      value.spec.rkeConfig.infrastructureRef = {
+      set(value, 'spec.rkeConfig.infrastructureRef', {
         kind:       'AWSCluster',
         name:       infraCluster.metadata.name,
         namespace:  infraCluster.metadata.namespace,
         apiVersion: 'infrastructure.cluster.x-k8s.io/v1beta2',
-      };
+      });
     }
   } catch (e) {
     throw new Error(formatErrorMessage(context, 'capa.errors.savingInfrastructureCluster', e));
-  }
-}
-
-export async function updateProvCluster(value: ClusterValue): Promise<void> {
-  value.spec = value.spec || {};
-  value.spec.rkeConfig = value.spec.rkeConfig || {};
-
-  if (!value?.spec?.rkeConfig?.additionalManifest) {
-    value.spec.rkeConfig.additionalManifest = ADDITIONAL_MANIFEST;
-  }
-  if (!value.spec.rkeConfig?.machineGlobalConfig) {
-    value.spec.rkeConfig.machineGlobalConfig = {};
-  }
-  if (value.spec.rkeConfig.machineGlobalConfig['cloud-provider-name'] !== 'external') {
-    value.spec.rkeConfig.machineGlobalConfig['cloud-provider-name'] = 'external';
-  }
-  if (value.spec.rkeConfig.machineGlobalConfig['node-name-from-cloud-provider-metadata'] !== true) {
-    value.spec.rkeConfig.machineGlobalConfig['node-name-from-cloud-provider-metadata'] = true;
   }
 }
 

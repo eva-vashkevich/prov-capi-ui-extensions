@@ -1,6 +1,6 @@
 ---
 capa:
-  description: Provision new CAPA (Cluster API Provider AWS) clusters or register existing ones.
+  description: Provision new CAPA (Cluster API Provider AWS) clusters.
   label: CAPI AWS
   clusterConfig:
     title: CAPI Cluster Configuration
@@ -94,3 +94,9 @@ capa:
     removingOldMachineConfig: "Error removing old machine config: {error}"
     savingMachineConfig: "Error saving machine config: {error}"
     savingInfrastructureCluster: "Error saving infrastructure cluster: {error}"
+    missingAdditionalManifest: RKE Config is missing additional manifest
+    invalidCloudProviderName: Cloud provider must be set to External when using CAPA
+
+cluster:
+  provider:
+    awsmachinetemplate: Cluster API Provider AWS

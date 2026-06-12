@@ -1,9 +1,11 @@
 import { IClusterProvisioner, ClusterProvisionerContext } from '@shell/core/types';
 import { mapDriver } from '@shell/store/plugins';
-import { createMachinePoolMachineConfig, initInfrastructureCluster, saveMachinePoolConfigs, saveInfrastructureCluster, updateProvCluster } from './utils';
+import {
+  createMachinePoolMachineConfig, initInfrastructureCluster, saveMachinePoolConfigs, saveInfrastructureCluster, prepareProvCluster, provisioningClusterValidation
+} from './utils';
 import { AWS_CLUSTER_SCHEMA, AWS_MACHINE_TEMPLATE_SCHEMA, InfrastructureClusterResource } from './types/capa';
 import ClusterConfiguration from './components/ClusterConfiguration.vue';
-import { isProviderEnabled } from "@shell/utils/settings";
+import { isProviderEnabled } from '@shell/utils/settings';
 
 export class CAPAProvisioner implements IClusterProvisioner {
   static ID = 'awsmachinetemplate';
@@ -36,10 +38,18 @@ export class CAPAProvisioner implements IClusterProvisioner {
     return async(value, infrastructureCluster, isEdit) => await saveInfrastructureCluster(value, infrastructureCluster, this.context, isEdit);
   }
 
-  get initInfrastructureCluster(): (value: any, infrastructureCluster: any) => Promise<InfrastructureClusterResource | {} | undefined> {
+  get initInfrastructureCluster(): (value: any) => Promise<InfrastructureClusterResource | {} | undefined> {
     const clusterSchemaType = this.clusterSchema?.id || AWS_CLUSTER_SCHEMA;
 
     return async(value) => await initInfrastructureCluster(value, clusterSchemaType, this.context);
+  }
+
+  get prepareProvCluster(): (cluster: any) => Promise<void> {
+    return async(cluster) => await prepareProvCluster(cluster, this.context);
+  }
+
+  get provisioningClusterValidation(): (cluster: any) => Promise<void> {
+    return async(cluster) => await provisioningClusterValidation(cluster, this.context);
   }
 
   get icon(): any {
@@ -59,7 +69,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
   }
 
   get hidden(): boolean {
-    return ! isProviderEnabled(this.context, 'aws');
+    return !isProviderEnabled(this.context, 'aws');
   }
 
   get extensionInfrastructureSection(): any {
@@ -88,9 +98,28 @@ export class CAPAProvisioner implements IClusterProvisioner {
 
   registerSaveHooks(
     registerBeforeHook: (fn: () => Promise<void>, name: string, priority?: number) => void,
-    _registerAfterHook: any,
-    value: any,
   ): void {
-    registerBeforeHook(() => updateProvCluster(value), 'update-prov-cluster-for-capi', 4);
+    const runSaveInfrastructureCluster = this.saveInfrastructureCluster;
+    const runProvisioningClusterValidation = this.provisioningClusterValidation;
+
+    registerBeforeHook(async function() {
+      return runProvisioningClusterValidation(this.value);
+    }, 'validate-prov-cluster', 2);
+    registerBeforeHook(async function() {
+      return runSaveInfrastructureCluster(this.value, this.infrastructureCluster, this.isEdit);
+    }, 'save-infrastructure-cluster', 3);
+  }
+
+  registerInitHooks(registerInitHook: (fn: () => Promise<void>, name: string) => void, cluster: any): void {
+    const runInitInfrastructureCluster = this.initInfrastructureCluster;
+    const runPrepareProvCluster = this.prepareProvCluster;
+
+    registerInitHook(async function(value) {
+      this.infrastructureCluster = await runInitInfrastructureCluster(value);
+    }, 'init-infrastructure-cluster-for-capi');
+
+    registerInitHook(() => {
+      return runPrepareProvCluster(cluster);
+    }, 'prepare-prov-cluster-for-capi');
   }
 }
