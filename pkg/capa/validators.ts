@@ -60,6 +60,7 @@ const cidrBlock = (t: (key: string) => string, val: string, useUnmanagedNetwork:
 }
 
 const region = (t: (key: string) => string, val: string) => {
+  console.log('*** validating presence of region value ', val)
     return val && val !== '' ? true : t('capa.errors.regionRequired');
 }
 

@@ -45,8 +45,10 @@ interface Props {
   cniIngressRules?: any[];
   vpcInfo?: AWS.VPC[];
   subnetInfo?: AWS.Subnet[];
+  securityGroupInfo?: AWS.SecurityGroup[];
   loadingVpcs?: boolean;
   loadingSubnets?: boolean;
+  loadingSecurityGroups?: boolean;
   useUnmanagedNetwork?: boolean;
   provisioningCluster?: any;
 }
@@ -62,8 +64,10 @@ const props = withDefaults(defineProps<Props>(), {
   cniIngressRules:                    () => [],
   vpcInfo:                            () => [],
   subnetInfo:                         () => [],
+  securityGroupInfo:                  () => [],
   loadingVpcs:                        false,
   loadingSubnets:                     false,
+  loadingSecurityGroups:              false,
   useUnmanagedNetwork:                false,
   provisioningCluster:                {},
 });
@@ -71,7 +75,7 @@ const props = withDefaults(defineProps<Props>(), {
 const {
   vpcId, subnets, credentialId, region, ipv6, cidrBlock,
   mode, securityGroupOverrides, additionalControlPlaneIngressRules, additionalNodeIngressRules, cniIngressRules,
-  vpcInfo, subnetInfo, loadingVpcs, loadingSubnets, useUnmanagedNetwork, provisioningCluster
+  vpcInfo, subnetInfo, securityGroupInfo, loadingVpcs, loadingSubnets, loadingSecurityGroups, useUnmanagedNetwork, provisioningCluster
 } = toRefs(props);
 
 const store = useStore();
@@ -160,12 +164,15 @@ function goToBasicsCniSelect(e: MouseEvent) {
   }
 }
 
-watch(useUnmanagedNetwork, (neu) => {
-  if (!neu) {
-    emit('update:vpcId', '');
-    emit('update:subnets', []);
+// clear out vpcid and subnets if the radio group changes the value of useUnmanagedNetwork
+// this avoids clearing out vpcid/subnets aws set when useUnmanagedNetwork is initialized on edit
+function userUpdatedUnamangedNetwork(neu: boolean){
+  if(!neu){
+    emit('update:vpcId', null);
+    emit('update:subnets', null);
   }
-});
+  emit('update:useUnmanagedNetwork', neu)
+}
 
 watch(vpcId, () => {
   emit('update:subnets', []);
@@ -231,7 +238,8 @@ watch(allowCNIRules, (allowed) => {
     name="network-strategy"
     :options="networkStrategyOptions"
     :mode="mode"
-    @update:value="$emit('update:useUnmanagedNetwork', $event)"
+    @update:value="userUpdatedUnamangedNetwork"
+    :disabled="!isCreate"
   />
 
   <RcSection
@@ -251,6 +259,7 @@ watch(allowCNIRules, (allowed) => {
         name="vpc"
         required
         @update:value="$emit('update:vpcId', $event)"
+        :disabled="!isCreate"
       />
     </div>
     <div class="mb-20 span-6">
@@ -313,8 +322,8 @@ watch(allowCNIRules, (allowed) => {
       <SecurityOverrides
         :value="securityGroupOverrides"
         :vpc-id="vpcId"
-        :region="region"
-        :credential-id="credentialId"
+        :security-group-info="securityGroupInfo"
+        :loading-security-groups="loadingSecurityGroups"
         :mode="mode"
 
         @update:value="$emit('update:securityGroupOverrides', $event)"
@@ -332,9 +341,9 @@ watch(allowCNIRules, (allowed) => {
         v-if="allowAdditionalCPRules"
         :value="additionalControlPlaneIngressRules"
         :mode="mode"
-        :region="region"
-        :credential-id="credentialId"
         :vpc-id="vpcId"
+        :security-group-info="securityGroupInfo"
+        :loading-security-groups="loadingSecurityGroups"
         :disable-add="!allowAdditionalCPRules"
         :title-prefix="t('capa.clusterConfig.network.additionalControlPlaneIngressRules.ruleSectionTitlePrefix')"
         @update:value="$emit('update:additionalControlPlaneIngressRules', $event)"
@@ -359,9 +368,9 @@ watch(allowCNIRules, (allowed) => {
         v-if="allowAdditionalNodeRules"
         :value="additionalNodeIngressRules"
         :mode="mode"
-        :region="region"
-        :credential-id="credentialId"
         :vpc-id="vpcId"
+        :security-group-info="securityGroupInfo"
+        :loading-security-groups="loadingSecurityGroups"
         :disable-add="!allowAdditionalNodeRules"
         :title-prefix="t('capa.clusterConfig.network.additionalNodeIngressRules.ruleSectionTitlePrefix')"
         @update:value="$emit('update:additionalNodeIngressRules', $event)"
@@ -400,9 +409,9 @@ watch(allowCNIRules, (allowed) => {
         v-if="allowCNIRules"
         :value="cniIngressRules"
         :mode="mode"
-        :region="region"
-        :credential-id="credentialId"
         :vpc-id="vpcId"
+        :security-group-info="securityGroupInfo"
+        :loading-security-groups="loadingSecurityGroups"
         :title-prefix="t('capa.clusterConfig.network.cniIngressRules.ruleSectionTitlePrefix')"
         :allow-targets="false"
         @update:value="$emit('update:cniIngressRules', $event)"

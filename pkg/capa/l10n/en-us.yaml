@@ -191,3 +191,7 @@ cluster:
     ingressCidrBlocks: '"{value}" is not a valid IPv4 CIDR block.'
     ipv6VpcRequired: The selected VPC does not support IPv6. Choose a VPC with an associated IPv6 CIDR block.
     ipv6SubnetsRequired: One or more selected subnets do not support IPv6. All subnets must have an IPv6 CIDR association when IPv6 is enabled.
+    fetchingRegions: "Error fetching regions: {error}"
+    fetchingSshKeys: "Error fetching SSH keys: {error}"
+    fetchingVpcs: "Error fetching VPCs: {error}"
+    fetchingSubnets: "Error fetching subnets: {error}"
