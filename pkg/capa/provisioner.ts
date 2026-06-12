@@ -53,7 +53,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
   }
 
   get icon(): any {
-    return require('./assets/amazonecapa.svg');
+    return require('./assets/amazoncapa.svg');
   }
 
   get group(): string {
@@ -104,7 +104,7 @@ export class CAPAProvisioner implements IClusterProvisioner {
 
     registerBeforeHook(async function(this: any) {
       return runProvisioningClusterValidation(this.value);
-    }, 'validate-prov-cluster', 2);
+    }, 'validate-prov-cluster', 1);
     registerBeforeHook(async function(this: any) {
       return runSaveInfrastructureCluster(this.value, this.infrastructureCluster, this.isEdit);
     }, 'save-infrastructure-cluster', 3);

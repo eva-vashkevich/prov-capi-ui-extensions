@@ -14,7 +14,7 @@ export default function(plugin: IExtension): void {
   plugin.register('provisioner', CAPAProvisioner.ID, CAPAProvisioner);
 
   // Built-in icon
-  plugin.metadata.icon = require('./assets/amazonecapa.svg');
+  plugin.metadata.icon = require('./assets/amazoncapa.svg');
   // Register machine config component
   plugin.register('machine-config', CAPAProvisioner.ID, () => import('./machine-config/capa.vue'));
 }
