@@ -94,7 +94,7 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
       }
     }
     if (config) {
-      config.spec = removeEmptyFields(config.spec);
+      config.spec = removeEmptyFields(config.spec) || {};
     }
 
     // TODO handle case where config is still missing and make sure spec is setup correctly
