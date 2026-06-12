@@ -25,7 +25,7 @@ spec:
       - --v=5
       - --cloud-provider=aws`;
 
-function formatErrorMessage(context: StoreContext, key: string, e: any): string {
+function formatErrorMessage(context: StoreContext, key: string, e?: any): string {
   const error = e instanceof Error || e?.message ? e.message : String(e);
   const t = context.t || context.$t;
 
@@ -93,7 +93,9 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
         throw new Error(formatErrorMessage(context, 'capa.errors.creatingInfrastructureClusterConfig', e));
       }
     }
-    config.spec = removeEmptyFields(config.spec);
+    if (config) {
+      config.spec = removeEmptyFields(config.spec);
+    }
 
     // TODO handle case where config is still missing and make sure spec is setup correctly
     return config || {};

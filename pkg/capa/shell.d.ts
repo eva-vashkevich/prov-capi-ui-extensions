@@ -65,6 +65,10 @@ declare module '@shell/utils/error' {
   export function isDoNotLogError(err: unknown): boolean;
 }
 
+declare module '@shell/utils/object' {
+  export function set(obj: any, path: string, value: any): void;
+}
+
 declare module '@shell/plugins/dashboard-store/actions' {
   export const _MULTI: string;
 }

@@ -102,10 +102,10 @@ export class CAPAProvisioner implements IClusterProvisioner {
     const runSaveInfrastructureCluster = this.saveInfrastructureCluster;
     const runProvisioningClusterValidation = this.provisioningClusterValidation;
 
-    registerBeforeHook(async function() {
+    registerBeforeHook(async function(this: any) {
       return runProvisioningClusterValidation(this.value);
     }, 'validate-prov-cluster', 2);
-    registerBeforeHook(async function() {
+    registerBeforeHook(async function(this: any) {
       return runSaveInfrastructureCluster(this.value, this.infrastructureCluster, this.isEdit);
     }, 'save-infrastructure-cluster', 3);
   }
@@ -114,8 +114,8 @@ export class CAPAProvisioner implements IClusterProvisioner {
     const runInitInfrastructureCluster = this.initInfrastructureCluster;
     const runPrepareProvCluster = this.prepareProvCluster;
 
-    registerInitHook(async function(value) {
-      this.infrastructureCluster = await runInitInfrastructureCluster(value);
+    registerInitHook(async function(this: any) {
+      this.infrastructureCluster = await runInitInfrastructureCluster(cluster);
     }, 'init-infrastructure-cluster-for-capi');
 
     registerInitHook(() => {
