@@ -45,7 +45,7 @@ let updatingFromProp = false;
 
 const securityGroupOptions = computed(() => {
   if (!vpcId.value) {
-    return [t('capa.clusterConfig.network.securityGroups.selectVpc')];
+    return []
   }
 
   return securityGroupInfo.value.reduce((opts, sg) => {
@@ -54,7 +54,7 @@ const securityGroupOptions = computed(() => {
     }
 
     return opts;
-  }, [] as any);
+  }, [] as {label:string, value: string}[]);
 });
 
 const securityGroupRoleOptions = computed(() => {
@@ -88,7 +88,7 @@ function addOverride(targetRole: string) {
   // Create a new object to ensure reactivity triggers
   localValue.value = {
     ...localValue.value,
-    [targetRole]: securityGroupOptions.value[0].value
+    [targetRole]: securityGroupOptions.value[0]?.value
   };
 }
 
@@ -119,7 +119,6 @@ watch(value, (neu) => {
 
 watch(localValue, (neu) => {
   if (updatingFromProp) return;
-  value.value = neu;
   emit('update:value', neu);
 });
 
@@ -153,6 +152,8 @@ watch(localValue, (neu) => {
           :value="row.value"
           :options="securityGroupOptions"
           :loading="loadingSecurityGroups"
+          :disabled="!vpcId"
+          :placeholder="!vpcId ? t('capa.clusterConfig.network.securityGroups.selectVpc'): ''"
           :mode="mode"
           compact
           @update:value="(newValue: string) => updateRowValue(row.key, newValue)"

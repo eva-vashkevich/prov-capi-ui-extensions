@@ -115,7 +115,8 @@ export async function createMachinePoolMachineConfig(machineConfigSchema: Machin
   const config = createConfig || {};
 
   // TODO apply some defaults
-  return config;}
+  return config;
+}
 
 export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: ClusterValue, context: StoreContext): Promise<void> {
   const finalPools: MachinePool[] = [];
@@ -250,5 +251,5 @@ export function removeEmptyFields(input: any): any {
 export function isCapaManagedVpcId(vpcId = '', vpcs = [] as AWS.VPC[]) {
   const vpc = vpcs.find((v) => v?.VpcId === vpcId);
 
-  return !(vpc?.Tags || [])?.some((tag) => (tag.Key || '').startsWith(CAPA.CAPA_CLUSTER_PREFIX));
+  return (vpc?.Tags || [])?.some((tag) => (tag.Key || '').startsWith(CAPA.CAPA_CLUSTER_PREFIX));
 }

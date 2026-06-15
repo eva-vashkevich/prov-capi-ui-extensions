@@ -4,14 +4,14 @@ import {
 } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from '@shell/composables/useI18n';
-import LabeledSelect from '@shell/components/form/LabeledSelect';
+import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import Banner from '@components/Banner/Banner.vue';
 import { RcSection } from '@components/RcSection';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
 import Networking from './Networking.vue';
 import { NORMAN } from '@shell/config/types';
-import { get, set } from '@shell/utils/object.js';
+import { get, set, remove } from '@shell/utils/object.js';
 import KeyValue from '@shell/components/form/KeyValue';
 import * as AWS from '@shell/types/aws-sdk';
 import { useFormValidation } from '@shell/composables/useFormValidation';
@@ -35,7 +35,6 @@ const defaultConfig = {
       }],
     },
     sshKeyName:               '', // empty string -> no ssh key. unset -> use "default" key
-    identityRef:              {  kind: 'AWSClusterStaticIdentity' },
     controlPlaneLoadBalancer: {
       healthCheckProtocol: 'TCP',
       loadBalancerType:    'nlb'
@@ -73,8 +72,8 @@ if (value.value && !value.value.spec) {
 
 const store = useStore();
 const { t } = useI18n(store);
-const credentialErrors = ref<string[]>([]); // errors getting or using rancher cloud cred
-const credential = ref<RancherAwsCloudCredential>({}) // rancher cloud credential resource: needed to get an identity reference and default region
+const credentialErrors = ref<string[]>([]); // errors fetching data to populate the form (do not block form submission)
+const credential = ref<RancherAwsCloudCredential>({}) // rancher cloud credential resource, needed to get an identity reference and default region
 const useUnmanagedNetwork = ref(false); // used by a radio in networking and doesn't correspond to anything in cluster config - tracking it here to use w/ validators
 const ec2Client = ref(null);
 const regionInfo = ref<AWS.EC2Region[]>([]);
@@ -88,7 +87,8 @@ const loadingVpcs = ref(false);
 const loadingSubnets = ref(false);
 const loadingSecurityGroups = ref(false);
 
-const { getRules, isFormValid, validateForm } = useFormValidation(
+
+const { getRules, isFormValid } = useFormValidation(
   t,
   [
     { path: 'region',    rules: ['region'] },
@@ -114,7 +114,11 @@ function specComputed<T>(path: string, defaultValue: T): WritableComputedRef<T> 
   return computed({
     get: () => get(value.value, path) ?? defaultValue,
     set: (neu: T) => {
-      set(value.value, path, neu);
+      if (neu === null || neu === undefined) {
+        remove(value.value, path);
+      } else {
+        set(value.value, path, neu);
+      }
       emit('update:value', value.value);
     },
   });
@@ -144,9 +148,16 @@ const ipv6: WritableComputedRef<object | null> = computed({
   },
 });
 
+const hasIdentityRef = computed(() => {
+  const ref = value.value?.spec?.identityRef;
+
+  return !!(ref?.name && ref?.kind);
+});
+
 const isCreate = computed(()=>{
   return mode.value === _CREATE
 })
+
 
 const regionOptions = computed(() => {
   if ( !regionInfo.value ) {
@@ -165,8 +176,8 @@ const sshKeyOptions = computed(() => {
     return [noneOption];
   }
 
-  return [noneOption, ...sshKeyInfo.value.map((k: {KeyName: string, KeyPairId: string}) => {
-    return { label: k.KeyName, value: k.KeyPairId };
+  return [noneOption, ...sshKeyInfo.value.map((k: {KeyName: string}) => {
+    return { label: k.KeyName, value: k.KeyName };
   })];
 });
 
@@ -182,6 +193,7 @@ async function getCloudCredential(){
   if (!credentialId.value || !isCreate.value) {
     return;
   }
+  remove(value.value, 'spec.identityRef')
   try{
     credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value });
     initDefaultRegion()
@@ -192,11 +204,18 @@ async function getCloudCredential(){
 }
 
 function setIdentityRef() {
-  if (!credential.value || !credential.value.annotations?.[CAPA.IDENTITY_REF]) {
+  if (!credential.value) {
+    return;
+  }
+  const name = credential.value?.annotations?.[CAPA.IDENTITY_REF];
+
+  if (!name) {
+    // this shouldnt be hit because Turtles sets the annotation on all aws credentials, buuut just in case
+    // the template shows an error banner via v-if="!hasIdentityRef" if identityRef remains unset
     return;
   }
 
-   set(value.value, 'spec.identityRef.name', credential.value.annotations[CAPA.IDENTITY_REF]);
+  set(value.value, 'spec.identityRef', { name, kind: 'AWSClusterStaticIdentity' });
 }
 
 async function getRegions() {
@@ -307,9 +326,8 @@ onMounted(async() => {
 });
 
 
-// isFormValid reflects whether registered fields (via :rules) have errors; credentialErrors tracks AWS data-loading failures
-watch([isFormValid, credentialErrors], ([formValid = true, credErrs = []]) => {
-  emit('validationChanged', formValid && (!credErrs.length || !credErrs.find((e: string) => e.includes(t('capa.errors.fetchingCloudCredential', { error: '' })))));
+watch([isFormValid, hasIdentityRef], ([formValid = true, hasIdentityRef]) => {
+  emit('validationChanged', formValid && hasIdentityRef);
 });
 
 watch(useUnmanagedNetwork, (neu, old) => {
@@ -361,7 +379,12 @@ watch([
 
 <template>
   <div class="mb-20">
-    <Banner v-for="e in credentialErrors" color="error">{{ e }}</Banner>
+    <Banner :label="e" :key="e" v-for="e in credentialErrors" color="error"/>
+    <Banner
+      v-if="credentialId && !hasIdentityRef"
+      color="error"
+      :label="t('capa.errors.missingIdentityRef', { annotation: CAPA.IDENTITY_REF }, true)"
+    />
     <RcSection
       :title="t('capa.clusterConfig.title')"
       :expandable="true"

@@ -20,7 +20,7 @@ capa:
             description: CAPA will automatically create a completely new, fully configured VPC for this cluster (including Subnets and Security Groups).
           unmanaged: 
             label: Unmanaged network (manual configuration)
-            description: Bring your own AWS Instrastructure. Select an existing VPC and Subnets. By default, CAPA will still create Security Groups and a Control Plane Load Balancer.
+            description: Bring your own AWS Infrastructure. Select an existing VPC and Subnets. By default, CAPA will still create Security Groups and a Control Plane Load Balancer.
         unmanagedSettings:
           title: Unmanaged Network Settings
         enableIpv6: Enable IPv6
@@ -41,7 +41,7 @@ capa:
             placeholder: 10.0.0.0/16
         subnets:
           label: Subnets
-          description: In umanaged network mode, at least one subnet must be selected.
+          description: In unmanaged network mode, at least one subnet must be selected.
         securityGroups:
           label: Security Group Overrides
           description: Select existing security groups instead of using the CAPA controller to automatically create new ones. Only applies when using an unmanaged network.
@@ -191,6 +191,7 @@ capa:
     fetchingSubnets: "Error fetching subnets: {error}"
     fetchingSecurityGroups: "Error fetching security groups: {error}"
     fetchingCloudCredential: "Error fetching Rancher Cloud Credential details: {error}"
+    missingIdentityRef: "The selected cloud credential must contain a \"{annotation}\" annotation pointing to an AWSClusterStaticIdentity"
 
 cluster:
   provider:

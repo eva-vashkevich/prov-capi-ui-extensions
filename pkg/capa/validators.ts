@@ -24,7 +24,6 @@ const ipv6CidrBlocks = (t: Translator, blocks: string[] = []): string | undefine
 };
 
 const validateIngressRulesCidr = (t: Translator, additionalRules: IngressRule[] = []): string | undefined => {
-  console.log('*** ingress rules validator running with additionalRules ', additionalRules)
   const allIpv4 = additionalRules.flatMap((r = {} as IngressRule) => r.cidrBlocks || []);
   const allIpv6 = additionalRules.flatMap((r = {} as IngressRule) => r.ipv6CidrBlocks || []);
 

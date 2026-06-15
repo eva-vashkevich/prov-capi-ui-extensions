@@ -224,7 +224,7 @@ watch(vpcOptions, () => {
   // if users select 'managed networks' the UI will leave vpcId empty and CAPA will populate vpcId
   // on edit, we have to look at the VPC definition to see if its was created by CAPA to know if UI should show 'managed networks' or 'unmanaged networks' selected
   if (vpcId.value && vpcInfo.value) {
-    emit('update:useUnmanagedNetwork', isCapaManagedVpcId(vpcId.value, vpcInfo.value));
+    emit('update:useUnmanagedNetwork', !isCapaManagedVpcId(vpcId.value, vpcInfo.value));
   }
 });
 
