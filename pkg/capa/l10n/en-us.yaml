@@ -27,11 +27,11 @@ capa:
         networkSecurity:
           title: Network Security
         overrideBanners:
-          controlPlaneOverridden: The control plane security group has been manually overridden with an existing security group. Additional ingress rules can only be applied to security groups managed by CAPA.
+          controlPlaneOverridden: The control plane security group has been manually overridden with an existing security group. Additional ingress rules can only be applied to security groups created and managed by CAPA.
           nodeOverridden: The node security group has been manually overridden with an existing security group. Additional ingress rules can only be applied to the security groups created and managed by CAPA.
           nodeOverriddenCni: The node security group has been manually overridden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the control plane security group that CAPA will create.
           controlPlaneOverriddenCni: The control plane security group has been manually overridden with an existing security group. The CNI ingress rules will not apply, but they will still apply to the node security group that CAPA will create.
-          bothOverridden: Both node and control plane security groups have been overridden with existing security groups. CNI ingress rules can only be applied to security groups managed by CAPA.
+          bothOverridden: Both node and control plane security groups have been overridden with existing security groups. CNI ingress rules can only be applied to security groups created and managed by CAPA.
         vpc:
           label: VPC
           description: VPC to use with your cluster resources.
@@ -55,11 +55,11 @@ capa:
           securityGroupId: Security Group ID
           addOverride: Add SG override
         additionalControlPlaneIngressRules:
-          description: Set ingress rules for the control plane. Only CIDR blocks or Security Groups may be set, not both.
+          description: Set ingress rules for the control plane, used in addition to rules defined by CAPA. The source of each rule may be either CIDR blocks, security groups, or NAT gateways.
           label: Additional Control Plane Ingress Rules
           ruleSectionTitlePrefix: Control Plane
         additionalNodeIngressRules:
-          description: Set ingress rules for the control plane. Only CIDR blocks or Security Groups may be set, not both.
+          description: Set ingress rules for the worker nodes, used in addition to rules defined by CAPA. The source of each rule may be either CIDR blocks, security groups, or NAT gateways.
           label: Additional Node Ingress Rules
           ruleSectionTitlePrefix: Node
         cniProviderBanner: "This cluster is configured to use the {cni} CNI. To change the CNI plugin, go to the <a href=\"#basic\" aria-label='CNI plugin setting in the Basic cluster configuration tab'>Basic RKE2 Cluster Configuration Section</a>."

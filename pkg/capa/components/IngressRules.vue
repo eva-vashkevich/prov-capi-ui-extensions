@@ -178,21 +178,30 @@ function getCidrArray(cidrString: string) {
 }
 
 function allowCidr(rule: IngressRule) {
+  if (rule.natGatewaysIPsSource) return false;
   const { cidrBlocks = [], sourceSecurityGroupIDs = [], sourceSecurityGroupRoles = [] } = rule;
 
   return (!sourceSecurityGroupIDs.length && !sourceSecurityGroupRoles.length) || cidrBlocks.length;
 }
 
 function allowSecurityGroups(rule: IngressRule) {
+  if (rule.natGatewaysIPsSource) return false;
   const { cidrBlocks = [], sourceSecurityGroupIDs = [] } = rule;
 
   return vpcId.value && (!cidrBlocks.length || sourceSecurityGroupIDs.length);
 }
 
 function allowSecurityGroupRoles(rule: IngressRule) {
-  const { cidrBlocks = [], sourceSecurityGroupRoles = [] } = rule;
+  if (rule.natGatewaysIPsSource) return false;
+  const { cidrBlocks = [], sourceSecurityGroupRoles = [], ipv6CidrBlocks = [] } = rule;
 
-  return !cidrBlocks.length || sourceSecurityGroupRoles.length;
+  return (!cidrBlocks.length && !ipv6CidrBlocks.length) || sourceSecurityGroupRoles.length;
+}
+
+function allowNatGatewaysIPsSource(rule: IngressRule) {
+  const { cidrBlocks = [], sourceSecurityGroupIDs = [], sourceSecurityGroupRoles = [], ipv6CidrBlocks = [] } = rule;
+
+  return !cidrBlocks.length && !ipv6CidrBlocks.length && !sourceSecurityGroupIDs.length && !sourceSecurityGroupRoles.length;
 }
 
 function validateCidrString(cidrBlockString = '') {
@@ -367,6 +376,7 @@ function validateIpv6CidrString(cidrBlockString = '') {
       <Checkbox
         v-if="allowTargets"
         :value="rule.natGatewaysIPsSource"
+        :disabled="!allowNatGatewaysIPsSource(rule)"
         :mode="mode"
         :label="t('capa.clusterConfig.network.ingressRules.natGatewaysIPsSource')"
         @update:value="updateRule(index, 'natGatewaysIPsSource', $event)"

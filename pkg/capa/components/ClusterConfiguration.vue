@@ -157,7 +157,7 @@ const sshKeyOptions = computed(() => {
     return [noneOption];
   }
 
-  return [noneOption, ...sshKeyInfo.value.map((k) => {
+  return [noneOption, ...sshKeyInfo.value.map((k: {KeyName: string, KeyPairId: string}) => {
     return { label: k.KeyName, value: k.KeyPairId };
   })];
 });
@@ -293,11 +293,8 @@ async function getSecurityGroups() {
 onMounted(async() => {
   if (mode.value === _CREATE) {
     const valueWithDefaults = merge({}, defaultConfig, value.value);
-    const cleanedValueWithDefaults = removeEmptyFields(valueWithDefaults);
-    //TODO nb why this line - related to using createPopulated??
-    delete cleanedValueWithDefaults.spec.s3Bucket;
 
-    emit('update:value', cleanedValueWithDefaults || {});
+    emit('update:value', valueWithDefaults || {});
   }
 });
 

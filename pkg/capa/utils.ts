@@ -85,7 +85,7 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
     }
     if (configMissing) {
       try {
-        config = await context.dispatch('management/createPopulated', {
+        config = await context.dispatch('management/create', {
           type:     clusterSchema,
           metadata: { namespace: DEFAULT_WORKSPACE }
         }) as InfrastructureClusterResource;
