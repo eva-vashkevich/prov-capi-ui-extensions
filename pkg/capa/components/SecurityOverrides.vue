@@ -12,6 +12,7 @@ import KeyValue from '@shell/components/form/KeyValue.vue';
 import ButtonDropdown from '@shell/components/ButtonDropdown.vue';
 import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
 import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
+import type { SecurityGroupRole } from '../types/capa';
 
 defineOptions({ name: 'SecurityGroupOverrides' });
 
@@ -21,8 +22,7 @@ const emit = defineEmits([
 
 interface Props {
   vpcId: string;
-  // TODO nb type as map
-  value: any;
+  value: Record<string, string>;
   mode?: string;
   securityGroupInfo?: AWS.SecurityGroup[];
   loadingSecurityGroups?: boolean;
@@ -155,7 +155,7 @@ watch(localValue, (neu) => {
           :loading="loadingSecurityGroups"
           :mode="mode"
           compact
-          @update:value="(newValue) => updateRowValue(row.key, newValue)"
+          @update:value="(newValue: string) => updateRowValue(row.key, newValue)"
         />
       </template>
     </KeyValue>
@@ -167,7 +167,7 @@ watch(localValue, (neu) => {
       :dropdown-options="securityGroupRoleOptions"
       size="sm"
       class="btn btn-sm role-secondary"
-      @click-action="e=>addOverride(e.value)"
+      @click-action="(e: {value: string})=>addOverride(e.value)"
     />
   </div>
 </template>

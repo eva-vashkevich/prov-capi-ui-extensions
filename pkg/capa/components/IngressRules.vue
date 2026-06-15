@@ -12,13 +12,14 @@ import { removeEmptyFields } from '../utils';
 import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
 import * as validators from '../validators';
 import Checkbox from '@components/Form/Checkbox/Checkbox.vue';
+import type { IngressRule, SecurityGroupProtocol } from '../types/capa';
 
 defineOptions({ name: 'IngressRules' });
 
 const emit = defineEmits(['update:value']);
 
 interface Props {
-  value: any[];
+  value: IngressRule[];
   mode?: string;
   vpcId?: string;
   securityGroupInfo?: AWS.SecurityGroup[];
@@ -58,15 +59,12 @@ const PROTOCOLS = computed(() => [
   { label: t('capa.clusterConfig.network.ingressRules.protocols.esp'), value: '50' }
 ]);
 
-const defaultRule = {
+const defaultRule: IngressRule = {
   description: '',
-  protocol:    'tcp',
-  //   fromPort:    0,
-  //   toPort:      0,
-
+  protocol:    'tcp' as SecurityGroupProtocol,
 };
 
-const defaultRuleWithTargets = {
+const defaultRuleWithTargets: IngressRule = {
   ...defaultRule,
   cidrBlocks:               [],
   sourceSecurityGroupIDs:   [],
@@ -134,11 +132,11 @@ function getCidrString(cidrArray: string[]): string {
 const localCidr = ref<Record<number, string>>({});
 const localIpv6Cidr = ref<Record<number, string>>({});
 
-function getLocalCidrValue(index: number, cidrArray: string[]): string {
+function getLocalCidrValue(index: number, cidrArray: string[] = []): string {
   return index in localCidr.value ? localCidr.value[index] : getCidrString(cidrArray);
 }
 
-function getLocalIpv6CidrValue(index: number, cidrArray: string[]): string {
+function getLocalIpv6CidrValue(index: number, cidrArray: string[] = []): string {
   return index in localIpv6Cidr.value ? localIpv6Cidr.value[index] : getCidrString(cidrArray);
 }
 
@@ -179,15 +177,21 @@ function getCidrArray(cidrString: string) {
     .filter((s) => s.length > 0);
 }
 
-function allowCidr({ cidrBlocks = [], sourceSecurityGroupIDs = [], sourceSecurityGroupRoles = [] }) {
+function allowCidr(rule: IngressRule) {
+  const { cidrBlocks = [], sourceSecurityGroupIDs = [], sourceSecurityGroupRoles = [] } = rule;
+
   return (!sourceSecurityGroupIDs.length && !sourceSecurityGroupRoles.length) || cidrBlocks.length;
 }
 
-function allowSecurityGroups({ cidrBlocks = [], sourceSecurityGroupIDs = [] }) {
+function allowSecurityGroups(rule: IngressRule) {
+  const { cidrBlocks = [], sourceSecurityGroupIDs = [] } = rule;
+
   return vpcId.value && (!cidrBlocks.length || sourceSecurityGroupIDs.length);
 }
 
-function allowSecurityGroupRoles({ cidrBlocks = [], sourceSecurityGroupRoles = [] }) {
+function allowSecurityGroupRoles(rule: IngressRule) {
+  const { cidrBlocks = [], sourceSecurityGroupRoles = [] } = rule;
+
   return !cidrBlocks.length || sourceSecurityGroupRoles.length;
 }
 

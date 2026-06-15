@@ -15,6 +15,7 @@ import SecurityOverrides from './SecurityOverrides.vue';
 import Banner from '@components/Banner/Banner.vue';
 import { isCapaManagedVpcId } from '../utils';
 import { scrollToBottom } from '@shell/utils/scroll';
+import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole } from '../types/capa';
 
 defineOptions({ name: 'Networking' });
 
@@ -33,16 +34,14 @@ const emit = defineEmits([
 
 interface Props {
   vpcId: string;
-  subnets: {id: string}[];
+  subnets: SubnetSpec[];
   cidrBlock?: string;
   ipv6?: {} | null;
   mode?: string;
-  credentialId: any;
-  region?: string;
-  securityGroupOverrides?: {};
-  additionalControlPlaneIngressRules?: any[];
-  additionalNodeIngressRules?: any[];
-  cniIngressRules?: any[];
+  securityGroupOverrides?: Partial<Record<SecurityGroupRole, string>>;
+  additionalControlPlaneIngressRules?: IngressRule[];
+  additionalNodeIngressRules?: IngressRule[];
+  cniIngressRules?: CNIIngressRule[];
   vpcInfo?: AWS.VPC[];
   subnetInfo?: AWS.Subnet[];
   securityGroupInfo?: AWS.SecurityGroup[];
@@ -55,7 +54,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   mode:                               _CREATE,
-  region:                             '',
   ipv6:                               null,
   cidrBlock:                          '',
   securityGroupOverrides:             () => ({}),
@@ -73,7 +71,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const {
-  vpcId, subnets, credentialId, region, ipv6, cidrBlock,
+  vpcId, subnets, ipv6, cidrBlock,
   mode, securityGroupOverrides, additionalControlPlaneIngressRules, additionalNodeIngressRules, cniIngressRules,
   vpcInfo, subnetInfo, securityGroupInfo, loadingVpcs, loadingSubnets, loadingSecurityGroups, useUnmanagedNetwork, provisioningCluster
 } = toRefs(props);
@@ -81,13 +79,13 @@ const {
 const store = useStore();
 const { t } = useI18n(store);
 
-const allowAdditionalCPRules = computed(() => !(securityGroupOverrides.value as any)?.controlplane);
-const allowAdditionalNodeRules = computed(() => !(securityGroupOverrides.value as any)?.node);
+const allowAdditionalCPRules = computed(() => !(securityGroupOverrides.value)?.controlplane);
+const allowAdditionalNodeRules = computed(() => !(securityGroupOverrides.value)?.node);
 const allowCNIRules = computed(() => allowAdditionalNodeRules.value || allowAdditionalCPRules.value);
 
-const storedCPIngressRules = ref<any[]>([]);
-const storedNodeIngressRules = ref<any[]>([]);
-const storedCNIIngressRules = ref<any[]>([]);
+const storedCPIngressRules = ref<IngressRule[]>([]);
+const storedNodeIngressRules = ref<IngressRule[]>([]);
+const storedCNIIngressRules = ref<CNIIngressRule[]>([]);
 
 const provClusterCNI = computed(() => {
   return provisioningCluster?.value?.spec?.rkeConfig?.machineGlobalConfig?.cni;
@@ -176,14 +174,14 @@ function userUpdatedUnamangedNetwork(neu: boolean){
 
 watch(vpcId, () => {
   emit('update:subnets', []);
-  const cpRules = (additionalControlPlaneIngressRules.value || []).map((r: any) => {
+  const cpRules = (additionalControlPlaneIngressRules.value || []).map((r: IngressRule) => {
     const { sourceSecurityGroupIDs, ...rest } = r;
 
     return sourceSecurityGroupIDs ? rest : r;
   });
 
   emit('update:additionalControlPlaneIngressRules', cpRules);
-  const nodeRules = (additionalNodeIngressRules.value || []).map((r: any) => {
+  const nodeRules = (additionalNodeIngressRules.value || []).map((r: IngressRule) => {
     const { sourceSecurityGroupIDs, ...rest } = r;
 
     return sourceSecurityGroupIDs ? rest : r;

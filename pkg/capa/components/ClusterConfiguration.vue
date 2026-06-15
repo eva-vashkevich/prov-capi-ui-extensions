@@ -18,6 +18,7 @@ import * as AWS from '@shell/types/aws-sdk';
 import { useForm } from 'vee-validate';
 import * as validators from '../validators';
 import {CAPA} from '../labels-annotations'
+import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole, Tags, RancherAwsCloudCredential } from '../types/capa';
 
 defineOptions({ name: 'ClusterConfiguration' });
 
@@ -25,7 +26,7 @@ const emit = defineEmits<{(e: 'update:value', value: any): void, (e: 'validation
 
 const defaultConfig = {
   spec: {
-    // TODO nb ask Pedro for roles (or ETA)
+    // TODO nb cni-specific roles
     network: {
       additionalControlPlaneIngressRules: [{
         protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'], description: 'Allow all traffic between control plane and node security groups'
@@ -34,7 +35,7 @@ const defaultConfig = {
         protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'], description: 'Allow all traffic between control plane and node security groups'
       }],
     },
-    sshKeyName:               '', // empty string -> no ssh key. unset -> use ssh key literally called "default"
+    sshKeyName:               '', // empty string -> no ssh key. unset -> use "default" key
     identityRef:              {  kind: 'AWSClusterStaticIdentity' },
     controlPlaneLoadBalancer: {
       healthCheckProtocol: 'TCP',
@@ -74,10 +75,10 @@ if (value.value && !value.value.spec) {
 const store = useStore();
 const { t } = useI18n(store);
 const credentialErrors = ref<string[]>([]); // errors getting or using rancher cloud cred
-const credential = ref({}) // rancher cloud credential resource: needed to get an identity reference and default region
+const credential = ref<RancherAwsCloudCredential>({}) // rancher cloud credential resource: needed to get an identity reference and default region
 const useUnmanagedNetwork = ref(false); // used by a radio in networking and doesn't correspond to anything in cluster config - tracking it here to use w/ validators
 const ec2Client = ref(null);
-const regionInfo = ref([]);
+const regionInfo = ref<AWS.EC2Region[]>([]);
 const sshKeyInfo = ref([]);
 const loadingRegions = ref(false);
 const loadingSshKeys = ref(false);
@@ -115,12 +116,12 @@ const region = specComputed<string>('spec.region', '');
 const sshKeyName = specComputed<string>('spec.sshKeyName', '');
 const vpcId = specComputed<string>('spec.network.vpc.id', '');
 const cidrBlock = specComputed<string>('spec.network.vpc.cidrBlock', '');
-const securityGroupOverrides = specComputed<{}>('spec.network.securityGroupOverrides', {});
-const subnets = specComputed<{id: string}[]>('spec.network.subnets', []);
-const additionalControlPlaneIngressRules = specComputed<any[]>('spec.network.additionalControlPlaneIngressRules', []);
-const additionalNodeIngressRules = specComputed<any[]>('spec.network.additionalNodeIngressRules', []);
-const additionalTags = specComputed<{}>('spec.additionalTags', {});
-const cniIngressRules = specComputed<any[]>('spec.network.cni.cniIngressRules', []);
+const securityGroupOverrides = specComputed<Partial<Record<SecurityGroupRole, string>>>('spec.network.securityGroupOverrides', {});
+const subnets = specComputed<SubnetSpec[]>('spec.network.subnets', []);
+const additionalControlPlaneIngressRules = specComputed<IngressRule[]>('spec.network.additionalControlPlaneIngressRules', []);
+const additionalNodeIngressRules = specComputed<IngressRule[]>('spec.network.additionalNodeIngressRules', []);
+const additionalTags = specComputed<Tags>('spec.additionalTags', {});
+const cniIngressRules = specComputed<CNIIngressRule[]>('spec.network.cni.cniIngressRules', []);
 
 // ipv6 is "enabled" by setting an empty object and "disabled" by deleting the ipv6 field
 const ipv6: WritableComputedRef<object | null> = computed({
@@ -176,13 +177,13 @@ async function getCloudCredential(){
   try{
     credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value });
     initDefaultRegion()
-    getIdentityRef()
+    setIdentityRef()
   } catch (e){
     credentialErrors.value.push(t('capa.errors.fetchingCloudCredential', { error: e }))
   }
 }
 
-function getIdentityRef() {
+function setIdentityRef() {
   if (!credential.value || !credential.value.annotations?.[CAPA.IDENTITY_REF]) {
     return;
   }
@@ -199,9 +200,9 @@ async function getRegions() {
   }
 
   try {
-    const regions = await ec2Client.value.describeRegions({});
+    const regions = await store.dispatch('aws/depaginateList', { client: ec2Client.value, cmd: 'describeRegions' });
 
-    regionInfo.value = regions?.Regions || [];
+    regionInfo.value = regions || [];
   } catch (e) {
     credentialErrors.value.push(t('capa.errors.fetchingRegions', { error: e }));
   } finally {
@@ -218,9 +219,9 @@ async function getSshKeys() {
   }
 
   try {
-    const keys = await ec2Client.value.describeKeyPairs({});
+    const keys = await store.dispatch('aws/depaginateList', { client: ec2Client.value, cmd: 'describeKeyPairs' });
 
-    sshKeyInfo.value = keys.KeyPairs || [];
+    sshKeyInfo.value = keys || [];
   } catch (e) {
     credentialErrors.value.push(t('capa.errors.fetchingSshKeys', { error: e }));
   } finally {
@@ -279,9 +280,9 @@ async function getSecurityGroups() {
   }
 
   try {
-    const securityGroups = await ec2Client.value.describeSecurityGroups({});
+    const securityGroups = await store.dispatch('aws/depaginateList', { client: ec2Client.value, cmd: 'describeSecurityGroups' });
 
-    securityGroupInfo.value = securityGroups?.SecurityGroups || [];
+    securityGroupInfo.value = securityGroups || [];
   } catch (e) {
     credentialErrors.value.push(t('capa.errors.fetchingSecurityGroups', { error: e }));
   } finally {
@@ -357,7 +358,6 @@ watch([
 <template>
   <div class="mb-20">
     <Banner v-for="e in credentialErrors" color="error">{{ e }}</Banner>
-    {{ value }}
     <RcSection
       :title="t('capa.clusterConfig.title')"
       :expandable="true"

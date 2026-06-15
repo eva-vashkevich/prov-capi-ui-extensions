@@ -1,4 +1,5 @@
 import ipaddr from 'ipaddr.js';
+import type { IngressRule } from './types/capa';
 
 
 const ipv4CidrBlocks = (t: (key: string) => string, blocks: string[] = []) => {
@@ -21,9 +22,9 @@ const ipv6CidrBlocks = (t: (key: string) => string, blocks: string[] = []) => {
   }
 };
 
-const validateIngressRulesCidr = (t: (key: string) => string, additionalRules = []) => {
-  const allIpv4 = additionalRules.flatMap((r = {}) => r.cidrBlocks || []);
-  const allIpv6 = additionalRules.flatMap((r = {}) => r.ipv6CidrBlocks || []);
+const validateIngressRulesCidr = (t: (key: string) => string, additionalRules = [] as IngressRule[]) => {
+  const allIpv4 = additionalRules.flatMap((r = {} as IngressRule) => r.cidrBlocks || []);
+  const allIpv6 = additionalRules.flatMap((r = {} as IngressRule) => r.ipv6CidrBlocks || []);
 
   return ipv4CidrBlocks(t, allIpv4) ?? ipv6CidrBlocks(t, allIpv6) ?? true;
 };
@@ -60,7 +61,6 @@ const cidrBlock = (t: (key: string) => string, val: string, useUnmanagedNetwork:
 }
 
 const region = (t: (key: string) => string, val: string) => {
-  console.log('*** validating presence of region value ', val)
     return val && val !== '' ? true : t('capa.errors.regionRequired');
 }
 

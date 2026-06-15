@@ -2,7 +2,7 @@ import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
 import { set } from '@shell/utils/object';
 import { createDoNotLogError } from '@shell/utils/error';
-import { AWS_MACHINE_TEMPLATE_SCHEMA, Translator, InfrastructureClusterResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext } from './types/capa';
+import { AWS_MACHINE_TEMPLATE_SCHEMA, Translator, InfrastructureClusterResource, InfrastructureMachineResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext } from './types/capa';
 import * as AWS from '@shell/types/aws-sdk';
 import { CAPA } from './labels-annotations';
 
@@ -102,7 +102,7 @@ export async function initInfrastructureCluster(value: ClusterValue, clusterSche
   }
 }
 
-export async function createMachinePoolMachineConfig(machineConfigSchema: MachineConfigSchema | undefined, context: StoreContext): Promise<InfrastructureClusterResource | Record<string, never>> {
+export async function createMachinePoolMachineConfig(machineConfigSchema: MachineConfigSchema | undefined, context: StoreContext): Promise<InfrastructureMachineResource | Record<string, never>> {
   const machineConfigType = machineConfigSchema?.id || AWS_MACHINE_TEMPLATE_SCHEMA;
 
   await context.dispatch('management/waitForSchema', { type: machineConfigType });
@@ -110,13 +110,12 @@ export async function createMachinePoolMachineConfig(machineConfigSchema: Machin
   const createConfig = await context.dispatch('management/createPopulated', {
     type:     machineConfigType,
     metadata: { namespace: DEFAULT_WORKSPACE }
-  }) as InfrastructureClusterResource | undefined;
+  }) as InfrastructureMachineResource | undefined;
 
   const config = createConfig || {};
 
   // TODO apply some defaults
-  return config;
-}
+  return config;}
 
 export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: ClusterValue, context: StoreContext): Promise<void> {
   const finalPools: MachinePool[] = [];
@@ -150,7 +149,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         const oldConfig = entry.config;
 
         // Clone before mutating so oldConfig retains its identity (links/id) for removal.
-        const newConfig = await context.dispatch('management/clone', { resource: oldConfig }) as InfrastructureClusterResource;
+        const newConfig = await context.dispatch('management/clone', { resource: oldConfig }) as InfrastructureMachineResource;
 
         delete newConfig.id;
         delete newConfig.metadata.name;
