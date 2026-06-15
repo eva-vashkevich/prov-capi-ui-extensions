@@ -462,8 +462,6 @@ watch([
           v-model:cidr-block="cidrBlock"
           :provisioning-cluster="provisioningCluster"
           :mode="mode"
-          :region="region"
-          :credentialId="credentialId"
           :vpc-info="vpcInfo"
           :subnet-info="subnetInfo"
           :security-group-info="securityGroupInfo"

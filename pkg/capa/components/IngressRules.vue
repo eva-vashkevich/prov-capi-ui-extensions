@@ -188,7 +188,7 @@ function allowSecurityGroups(rule: IngressRule) {
   if (rule.natGatewaysIPsSource) return false;
   const { cidrBlocks = [], sourceSecurityGroupIDs = [] } = rule;
 
-  return vpcId.value && (!cidrBlocks.length || sourceSecurityGroupIDs.length);
+  return !!vpcId.value && (!cidrBlocks.length || sourceSecurityGroupIDs.length);
 }
 
 function allowSecurityGroupRoles(rule: IngressRule) {
