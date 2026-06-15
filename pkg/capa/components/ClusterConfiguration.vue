@@ -16,7 +16,7 @@ import KeyValue from '@shell/components/form/KeyValue';
 import * as AWS from '@shell/types/aws-sdk';
 import { useFormValidation } from '@shell/composables/useFormValidation';
 import * as validators from '../validators';
-import { CAPA } from '../labels-annotations'
+import { CAPA } from '../labels-annotations';
 import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole, Tags, RancherAwsCloudCredential } from '../types/capa';
 
 defineOptions({ name: 'ClusterConfiguration' });
@@ -342,7 +342,7 @@ watch([
   () => credentialId.value,
 ], async([newRegion, newCredentialId], [oldRegion, oldCredentialId]) => {
     credentialErrors.value = []
-    if(newCredentialId){
+    if(newCredentialId && newCredentialId !== oldCredentialId){
       // need to await cloud cred as subsequent functions depend on it
       // the other get* functions are not awaited and loading props are used to display spinners in relevant inputs
       await getCloudCredential();

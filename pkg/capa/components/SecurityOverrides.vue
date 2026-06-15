@@ -50,7 +50,7 @@ const securityGroupOptions = computed(() => {
 
   return securityGroupInfo.value.reduce((opts, sg) => {
     if (sg.VpcId === vpcId.value) {
-      opts.push({ label: `${ sg.GroupName } (${ sg.Description })`, value: sg.SecurityGroupArn });
+      opts.push({ label: `${ sg.GroupName } (${ sg.Description })`, value: sg.GroupId });
     }
 
     return opts;
@@ -67,14 +67,6 @@ const securityGroupRoleOptions = computed(() => {
 
 function getRoleLabel(role: string) {
   return t(`capa.clusterConfig.network.securityGroups.roles.${ role }`);
-}
-
-function updateRowKey(oldKey: string, newKey: string, value: string) {
-  const updated = { ...localValue.value };
-
-  delete updated[oldKey];
-  updated[newKey] = value;
-  localValue.value = updated;
 }
 
 function updateRowValue(key: string, newValue: string) {
@@ -99,9 +91,7 @@ function updateOverrides(neu: Record<string, string>) {
 
 watch(vpcId, (neu, old) => {
   if (old) {
-    Object.keys(localValue.value).forEach((k) => {
-      localValue.value[k] = '';
-    });
+    localValue.value = Object.fromEntries(Object.keys(localValue.value).map((k) => [k, '']));
   }
 });
 
