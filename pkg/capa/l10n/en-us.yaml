@@ -179,7 +179,7 @@ capa:
     subnetRequired: At least one subnet is required
     invalidIpv4Cidr: Invalid IPv4 CIDR format
     invalidIpv6Cidr: Invalid IPv6 CIDR format
-    vpcCidrBlock: VPC CIDR block must be a valid IPv4 CIDR (e.g., 10.0.0.0/16).
+    vpcCidrBlock: VPC CIDR block must be a valid CIDR (e.g., 10.0.0.0/16).
     vpcIdRequired: A VPC must be selected when using an unmanaged network.
     subnetsRequired: At least one subnet must be selected when using an unmanaged network.
     ingressCidrBlocks: '"{value}" is not a valid IPv4 CIDR block.'

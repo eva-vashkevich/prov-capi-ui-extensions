@@ -28,7 +28,7 @@ export type SecurityGroupProtocol = '-1' | '4' | 'tcp' | 'udp' | 'icmp' | '58' |
 export type SecurityGroupRole = 'bastion' | 'node' | 'controlplane' | 'apiserver-lb' | 'lb' | 'node-eks-additional';
 
 export interface IngressRule {
-  description: string;
+  description?: string;
   protocol: SecurityGroupProtocol;
   fromPort?: number;
   toPort?: number;
@@ -40,10 +40,10 @@ export interface IngressRule {
 }
 
 export interface CNIIngressRule {
-  description: string;
+  description?: string;
   protocol: SecurityGroupProtocol;
-  fromPort: number;
-  toPort: number;
+  fromPort?: number;
+  toPort?: number;
 }
 
 export interface CNISpec {
