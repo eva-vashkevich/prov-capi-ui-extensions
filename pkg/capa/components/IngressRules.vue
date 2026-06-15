@@ -10,7 +10,7 @@ import RcSectionActions from '@components/RcSection/RcSectionActions.vue';
 import { useI18n } from '@shell/composables/useI18n';
 import { removeEmptyFields } from '../utils';
 import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
-import * as validators from '../validators';
+import * as cidrValidators from '../validators';
 import Checkbox from '@components/Form/Checkbox/Checkbox.vue';
 import type { IngressRule, SecurityGroupProtocol } from '../types/capa';
 
@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   loadingSecurityGroups: false,
   allowTargets:          true,
   titlePrefix:           '',
-  disableAdd:            false
+  disableAdd:            false,
 });
 
 const {
@@ -207,13 +207,13 @@ function allowNatGatewaysIPsSource(rule: IngressRule) {
 function validateCidrString(cidrBlockString = '') {
   const blocks = getCidrArray(cidrBlockString);
 
-  return validators.ipv4CidrBlocks(t, blocks);
+  return cidrValidators.ipv4CidrBlocks(t, blocks);
 }
 
 function validateIpv6CidrString(cidrBlockString = '') {
   const blocks = getCidrArray(cidrBlockString);
 
-  return validators.ipv6CidrBlocks(t, blocks);
+  return cidrValidators.ipv6CidrBlocks(t, blocks);
 }
 </script>
 

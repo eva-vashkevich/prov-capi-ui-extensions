@@ -10,14 +10,13 @@ import { RcSection } from '@components/RcSection';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
 import Networking from './Networking.vue';
-import { removeEmptyFields } from '../utils';
 import { NORMAN } from '@shell/config/types';
-import { isEmpty, get, set } from '@shell/utils/object.js';
+import { get, set } from '@shell/utils/object.js';
 import KeyValue from '@shell/components/form/KeyValue';
 import * as AWS from '@shell/types/aws-sdk';
-import { useForm } from 'vee-validate';
+import { useFormValidation } from '@shell/composables/useFormValidation';
 import * as validators from '../validators';
-import {CAPA} from '../labels-annotations'
+import { CAPA } from '../labels-annotations'
 import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole, Tags, RancherAwsCloudCredential } from '../types/capa';
 
 defineOptions({ name: 'ClusterConfiguration' });
@@ -89,16 +88,25 @@ const loadingVpcs = ref(false);
 const loadingSubnets = ref(false);
 const loadingSecurityGroups = ref(false);
 
-const { errors: validationErrors } = useForm({
-  validationSchema: {
-    vpc:    (val: string) => validators.vpc(t, val, useUnmanagedNetwork.value),
-    subnet: (val: string[]) => validators.subnet(t, val, useUnmanagedNetwork.value),
-    cidrBlock: (val: string) => validators.cidrBlock(t, val, useUnmanagedNetwork.value),
-    region: () => validators.region(t, region.value), //TODO nb hack around issue w/ useForm
-    nodeIngressCidr: () => validators.validateIngressRulesCidr(t, additionalNodeIngressRules.value),
-    cpIngressCidr: () => validators.validateIngressRulesCidr(t, additionalControlPlaneIngressRules.value),
+const { getRules, isFormValid, validateForm } = useFormValidation(
+  t,
+  [
+    { path: 'region',    rules: ['region'] },
+    { path: 'vpc',       rules: ['vpc'] },
+    { path: 'subnet',    rules: ['subnet'] },
+    { path: 'cidrBlock', rules: ['cidrBlock'] },
+    { path: 'additionalControlPlaneIngressRules', rules: ['additionalControlPlaneIngressRules'] },
+    { path: 'additionalNodeIngressRules',          rules: ['additionalNodeIngressRules'] },
+  ],
+  {
+    region:    (val: unknown) => validators.region(t, val as string),
+    vpc:       (val: unknown) => validators.vpc(t, val as string, useUnmanagedNetwork.value),
+    subnet:    (val: unknown) => validators.subnet(t, val as string[], useUnmanagedNetwork.value),
+    cidrBlock: (val: unknown) => validators.cidrBlock(t, val as string, useUnmanagedNetwork.value),
+    additionalControlPlaneIngressRules: () => validators.validateIngressRulesCidr(t, additionalControlPlaneIngressRules.value),
+    additionalNodeIngressRules:         () => validators.validateIngressRulesCidr(t, additionalNodeIngressRules.value),
   }
-});
+);
 
 // Helper to create computed properties backed by a nested path on value.value
 // `set` from @shell/utils/object creates intermediate objects along the path
@@ -299,10 +307,9 @@ onMounted(async() => {
 });
 
 
-//validation errors are from useForm and reported in individual inputs
-// credential errors are errors getting credential or loading aws data, reported in error banner
-watch([validationErrors, credentialErrors], ([validationErrs={}, credErrs=[]]) => {
-  emit('validationChanged', isEmpty(validationErrs) && (!credErrs.length || !credErrs.find((e:string) =>e.includes(t('capa.errors.fetchingCloudCredential', { error: '' })))));
+// isFormValid reflects whether registered fields (via :rules) have errors; credentialErrors tracks AWS data-loading failures
+watch([isFormValid, credentialErrors], ([formValid = true, credErrs = []]) => {
+  emit('validationChanged', formValid && (!credErrs.length || !credErrs.find((e: string) => e.includes(t('capa.errors.fetchingCloudCredential', { error: '' })))));
 });
 
 watch(useUnmanagedNetwork, (neu, old) => {
@@ -378,6 +385,7 @@ watch([
               :label="t('capa.clusterConfig.region.label')"
               :placeholder="t('capa.clusterConfig.region.placeholder')"
               name="region"
+              :rules="getRules('region')"
               :disabled="!isCreate"
             />
           </div>
@@ -439,6 +447,11 @@ watch([
           :loading-vpcs="loadingVpcs"
           :loading-subnets="loadingSubnets"
           :loading-security-groups="loadingSecurityGroups"
+          :vpc-validators="getRules('vpc')"
+          :subnet-validators="getRules('subnet')"
+          :cidr-block-validators="getRules('cidrBlock')"
+          :additional-control-plane-ingress-rules-validators="getRules('additionalControlPlaneIngressRules')"
+          :additional-node-ingress-rules-validators="getRules('additionalNodeIngressRules')"
         />
       </RcSection>
     </RcSection>

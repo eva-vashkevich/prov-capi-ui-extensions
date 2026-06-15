@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toRefs, ref, watch, computed } from 'vue';
+import { useVeeValidateField } from '@shell/composables/useVeeValidateField';
 import { useStore } from 'vuex';
 import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import RadioGroup from '@components/Form/Radio/RadioGroup.vue';
@@ -50,6 +51,11 @@ interface Props {
   loadingSecurityGroups?: boolean;
   useUnmanagedNetwork?: boolean;
   provisioningCluster?: any;
+  vpcValidators?: Array<(val: unknown) => string | undefined>;
+  subnetValidators?: Array<(val: unknown) => string | undefined>;
+  cidrBlockValidators?: Array<(val: unknown) => string | undefined>;
+  additionalControlPlaneIngressRulesValidators?: Array<(val: unknown) => string | undefined>;
+  additionalNodeIngressRulesValidators?: Array<(val: unknown) => string | undefined>;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -68,16 +74,40 @@ const props = withDefaults(defineProps<Props>(), {
   loadingSecurityGroups:              false,
   useUnmanagedNetwork:                false,
   provisioningCluster:                {},
+  vpcValidators:                                    () => [],
+  subnetValidators:                                 () => [],
+  cidrBlockValidators:                              () => [],
+  additionalControlPlaneIngressRulesValidators:     () => [],
+  additionalNodeIngressRulesValidators:             () => [],
 });
 
 const {
   vpcId, subnets, ipv6, cidrBlock,
   mode, securityGroupOverrides, additionalControlPlaneIngressRules, additionalNodeIngressRules, cniIngressRules,
-  vpcInfo, subnetInfo, securityGroupInfo, loadingVpcs, loadingSubnets, loadingSecurityGroups, useUnmanagedNetwork, provisioningCluster
+  vpcInfo, subnetInfo, securityGroupInfo, loadingVpcs, loadingSubnets, loadingSecurityGroups, useUnmanagedNetwork, provisioningCluster,
+  vpcValidators, subnetValidators, cidrBlockValidators,
+  additionalControlPlaneIngressRulesValidators, additionalNodeIngressRulesValidators,
 } = toRefs(props);
 
 const store = useStore();
 const { t } = useI18n(store);
+
+// Register these array-valued fields with the parent useFormValidation form context so that
+// isFormValid reflects CIDR validation errors. Per-input error display is handled by IngressRules
+// via the useLabeledFormElement rules path (independent of vee-validate).
+useVeeValidateField({
+  name:              ref('additionalControlPlaneIngressRules'),
+  rules:             additionalControlPlaneIngressRulesValidators,
+  value:             computed(() => JSON.stringify(additionalControlPlaneIngressRules.value)),
+  validationMessage: ref(null),
+});
+
+useVeeValidateField({
+  name:              ref('additionalNodeIngressRules'),
+  rules:             additionalNodeIngressRulesValidators,
+  value:             computed(() => JSON.stringify(additionalNodeIngressRules.value)),
+  validationMessage: ref(null),
+});
 
 const allowAdditionalCPRules = computed(() => !(securityGroupOverrides.value)?.controlplane);
 const allowAdditionalNodeRules = computed(() => !(securityGroupOverrides.value)?.node);
@@ -255,6 +285,7 @@ watch(allowCNIRules, (allowed) => {
         :loading="loadingVpcs"
         :sub-label="t('capa.clusterConfig.network.vpc.description')"
         name="vpc"
+        :rules="vpcValidators"
         required
         @update:value="$emit('update:vpcId', $event)"
         :disabled="!isCreate"
@@ -270,6 +301,7 @@ watch(allowCNIRules, (allowed) => {
         :multiple="true"
         required
         name="subnet"
+        :rules="subnetValidators"
       />
     </div>
   </RcSection>
@@ -285,6 +317,7 @@ watch(allowCNIRules, (allowed) => {
         :sub-label="t('capa.clusterConfig.network.vpc.cidrBlock.description')"
         :mode="mode"
         name="cidrBlock"
+        :rules="cidrBlockValidators"
         :disabled="!isCreate"
         @update:value="$emit('update:cidrBlock', $event)"
       />
@@ -343,6 +376,7 @@ watch(allowCNIRules, (allowed) => {
         :security-group-info="securityGroupInfo"
         :loading-security-groups="loadingSecurityGroups"
         :disable-add="!allowAdditionalCPRules"
+        :validators="additionalControlPlaneIngressRulesValidators"
         :title-prefix="t('capa.clusterConfig.network.additionalControlPlaneIngressRules.ruleSectionTitlePrefix')"
         @update:value="$emit('update:additionalControlPlaneIngressRules', $event)"
       />
