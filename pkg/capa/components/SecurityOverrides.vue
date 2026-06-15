@@ -88,7 +88,7 @@ function addOverride(targetRole: string) {
   // Create a new object to ensure reactivity triggers
   localValue.value = {
     ...localValue.value,
-    [targetRole]: securityGroupOptions.value[0]?.value
+    [targetRole]: securityGroupOptions.value[0]?.value || ''
   };
 }
 
@@ -125,7 +125,6 @@ watch(localValue, (neu) => {
 </script>
 
 <template>
-  <!-- //TODO nb fix styling in template - inputs too high and not sharing horizontal space correctly -->
   <div
     v-if="Object.keys(localValue || {}).length"
   >
@@ -144,7 +143,6 @@ watch(localValue, (neu) => {
           disabled
           :value="getRoleLabel(row.key)"
           :mode="mode"
-          compact
         />
       </template>
       <template #value="{row}">
@@ -155,7 +153,6 @@ watch(localValue, (neu) => {
           :disabled="!vpcId"
           :placeholder="!vpcId ? t('capa.clusterConfig.network.securityGroups.selectVpc'): ''"
           :mode="mode"
-          compact
           @update:value="(newValue: string) => updateRowValue(row.key, newValue)"
         />
       </template>
@@ -174,8 +171,17 @@ watch(localValue, (neu) => {
 </template>
 
 <style lang="scss" scoped>
+// force the role input to match height of the security group select - KV appears to be forcing this height
 .display-role {
   min-height: $unlabeled-input-height;
   padding: 10px;
 }
+// ensure that both items are the same width
+:deep(.kv-item.key),
+:deep(.kv-item.value) {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 </style>
