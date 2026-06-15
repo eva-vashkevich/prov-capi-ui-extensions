@@ -22,7 +22,7 @@ const emit = defineEmits([
 
 interface Props {
   vpcId: string;
-  value: Record<SecurityGroupRole, string>;
+  value: Partial<Record<SecurityGroupRole, string>>;
   mode?: string;
   securityGroupInfo?: AWS.SecurityGroup[];
   loadingSecurityGroups?: boolean;

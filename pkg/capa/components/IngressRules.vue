@@ -186,9 +186,9 @@ function allowCidr(rule: IngressRule) {
 
 function allowSecurityGroups(rule: IngressRule) {
   if (rule.natGatewaysIPsSource) return false;
-  const { cidrBlocks = [], sourceSecurityGroupIDs = [] } = rule;
+  const { cidrBlocks = [], sourceSecurityGroupIDs = [], ipv6CidrBlocks=[] } = rule;
 
-  return !!vpcId.value && (!cidrBlocks.length || sourceSecurityGroupIDs.length);
+  return sourceSecurityGroupIDs.length || (!!vpcId.value && !cidrBlocks.length && !ipv6CidrBlocks.length);
 }
 
 function allowSecurityGroupRoles(rule: IngressRule) {

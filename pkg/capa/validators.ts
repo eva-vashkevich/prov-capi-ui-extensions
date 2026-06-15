@@ -1,5 +1,5 @@
 import ipaddr from 'ipaddr.js';
- import type { IngressRule, Translator } from './types/capa';
+import type { IngressRule, Translator } from './types/capa';
 
 const ipv4CidrBlocks = (t: Translator, blocks: string[] = []): string | undefined => {
   try {
