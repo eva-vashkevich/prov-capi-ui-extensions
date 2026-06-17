@@ -4,6 +4,8 @@ export const AWS_MACHINE_TEMPLATE_SCHEMA = 'infrastructure.cluster.x-k8s.io.awsm
 export const AWS_CLUSTER_SCHEMA = 'infrastructure.cluster.x-k8s.io.awscluster';
 export type Translator = (key: string, args?: Record<string, any>) => string;
 export type StringMap = Record<string, string>;
+export type Tags = Record<string, string>;
+
 
 export interface ResourceMetadata {
   name?: string;
@@ -12,24 +14,88 @@ export interface ResourceMetadata {
   resourceVersion?: string;
   uid?: string;
 }
+
 export interface InfrastructureRef {
   kind?: string;
   name?: string;
   namespace?: string;
   apiVersion?: string;
 }
-export interface RkeConfig {
-  infrastructureRef?: InfrastructureRef;
-  additionalManifest?: string;
-  machineGlobalConfig?: Record<string, unknown>;
-  machinePools?: MachinePool[];
+
+export type SecurityGroupProtocol = '-1' | '4' | 'tcp' | 'udp' | 'icmp' | '58' | '50';
+
+// ui only uses node, controlplane, apiserver-lb, lb
+export type SecurityGroupRole = 'bastion' | 'node' | 'controlplane' | 'apiserver-lb' | 'lb' | 'node-eks-additional';
+
+export interface IngressRule {
+  description?: string;
+  protocol: SecurityGroupProtocol;
+  fromPort?: number;
+  toPort?: number;
+  cidrBlocks?: string[];
+  ipv6CidrBlocks?: string[];
+  sourceSecurityGroupIDs?: string[];
+  sourceSecurityGroupRoles?: SecurityGroupRole[];
+  natGatewaysIPsSource?: boolean;
 }
-export interface ClusterValue {
-  metadata?: ResourceMetadata;
-  spec: {
-    rkeConfig?: RkeConfig;
-  };
+
+export interface CNIIngressRule {
+  description?: string;
+  protocol: SecurityGroupProtocol;
+  fromPort?: number;
+  toPort?: number;
 }
+
+export interface CNISpec {
+  cniIngressRules?: CNIIngressRule[];
+}
+export interface VPCSpec {
+  id?: string;
+  cidrBlock?: string;
+  ipv6?: {};
+}
+
+export interface SubnetSpec {
+  id: string;
+}
+
+export interface NetworkSpec {
+  vpc?: VPCSpec;
+  subnets?: SubnetSpec[];
+  cni?: CNISpec;
+  securityGroupOverrides?: Partial<Record<SecurityGroupRole, string>>;
+  additionalControlPlaneIngressRules?: IngressRule[];
+  additionalNodeIngressRules?: IngressRule[];
+  nodePortIngressRuleCidrBlocks?: string[];
+}
+
+// ui only uses nlb loadbalancer type and TCP protocol
+export type LoadBalancerType = 'classic' | 'elb' | 'alb' | 'nlb' | 'disabled';
+export type ELBProtocol = 'TCP' | 'SSL' | 'HTTP' | 'HTTPS' | 'TLS' | 'UDP';
+
+export interface AWSLoadBalancerSpec {
+  healthCheckProtocol?: ELBProtocol;
+  loadBalancerType?: LoadBalancerType;
+}
+
+// ui only uses AWSClusterStaticIdentity
+export type AWSIdentityKind = 'AWSClusterControllerIdentity' | 'AWSClusterRoleIdentity' | 'AWSClusterStaticIdentity';
+
+export interface AWSIdentityReference {
+  name: string;
+  kind: AWSIdentityKind;
+}
+
+export interface AWSClusterSpec {
+  network?: NetworkSpec;
+  region?: string;
+  sshKeyName?: string;
+  additionalTags?: Tags;
+  controlPlaneLoadBalancer?: AWSLoadBalancerSpec;
+  identityRef?: AWSIdentityReference;
+  s3Bucket?: any;
+}
+
 export interface MachineTemplateSpec {
   template: {
     spec: {
@@ -41,14 +107,39 @@ export interface MachineTemplateSpec {
   additionalTags?: StringMap;
   [key: string]: unknown;
 }
+
 export interface InfrastructureClusterResource {
   id?: string;
   metadata: ResourceMetadata;
-  spec: MachineTemplateSpec;
+  spec: AWSClusterSpec;
   links?: Record<string, unknown>;
   save: () => Promise<InfrastructureClusterResource>;
   remove?: () => Promise<void>;
 }
+
+export interface InfrastructureMachineResource {
+  id?: string;
+  metadata: ResourceMetadata;
+  spec: MachineTemplateSpec;
+  links?: Record<string, unknown>;
+  save: () => Promise<InfrastructureMachineResource>;
+  remove?: () => Promise<void>;
+}
+
+export interface RkeConfig {
+  infrastructureRef?: InfrastructureRef;
+  additionalManifest?: string;
+  machineGlobalConfig?: Record<string, unknown>;
+  machinePools?: MachinePool[];
+}
+
+export interface ClusterValue {
+  metadata?: ResourceMetadata;
+  spec: {
+    rkeConfig?: RkeConfig;
+  };
+}
+
 export interface MachinePool {
   name: string;
   machineConfigRef: {
@@ -56,16 +147,29 @@ export interface MachinePool {
   };
   [key: string]: unknown;
 }
+
 export interface PoolEntry {
   remove?: boolean;
   create?: boolean;
   update?: boolean;
   pool: MachinePool;
-  config: InfrastructureClusterResource;
+  config: InfrastructureMachineResource;
 }
+
 export interface MachineConfigSchema {
   id?: string;
 }
+
+export interface RancherAwsCloudCredential {
+  id?: string;
+  annotations?: Record<string, string>;
+  amazonec2credentialConfig?: {
+    defaultRegion?: string;
+    accessKey?: string;
+    secretKey?: string;
+  };
+}
+
 export type StoreContext = Pick<ClusterProvisionerContext, 'dispatch' | 'getters'> & {
   t?: Translator;
   $t?: Translator;
