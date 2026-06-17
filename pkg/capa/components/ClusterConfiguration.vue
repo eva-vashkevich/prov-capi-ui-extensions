@@ -9,6 +9,7 @@ import Banner from '@components/Banner/Banner.vue';
 import { RcSection } from '@components/RcSection';
 import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
+import debounce from 'lodash/debounce';
 import Networking from './Networking.vue';
 import { NORMAN } from '@shell/config/types';
 import { get, set, remove } from '@shell/utils/object.js';
@@ -317,6 +318,16 @@ async function getSecurityGroups() {
   }
 }
 
+const debouncedFetchAll = debounce((fetchRegions: boolean) => {
+  if (fetchRegions) {
+    getRegions();
+  }
+  getSshKeys();
+  getVpcs();
+  getSubnets();
+  getSecurityGroups();
+}, 1);
+
 onMounted(async() => {
   if (mode.value === _CREATE) {
     const valueWithDefaults = merge({}, defaultConfig, value.value);
@@ -357,15 +368,9 @@ watch([
         if(oldRegion && newRegion !== oldRegion && mode.value === _CREATE){
           vpcId.value = ''; // this will trigger removal of any vpc-dependent configuration
           sshKeyName.value = ''
-        } else if (!oldRegion) {
-          // initial mount: fetch regions without resetting vpc
-          getRegions();
         }
 
-        getSshKeys();
-        getVpcs();
-        getSubnets();
-        getSecurityGroups();
+        debouncedFetchAll(!oldRegion);
     } else {
       vpcInfo.value = []
       sshKeyInfo.value = []
