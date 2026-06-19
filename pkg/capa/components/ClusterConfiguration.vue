@@ -196,7 +196,9 @@ async function getCloudCredential(){
   }
   remove(value.value, 'spec.identityRef')
   try{
-    credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value });
+    // the response to the POST request to create creds doesn't ahve the requisite annotation, but it is added so quickly that re-fetching here works
+    // TODO nb do we need to add some retry logic if there is a slightly longer delay in annotating?
+    credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value, opt: {force: true} });
     initDefaultRegion()
     setIdentityRef()
   } catch (e){
@@ -340,6 +342,10 @@ onMounted(async() => {
 watch([isFormValid, hasIdentityRef], ([formValid = true, hasIdentityRef]) => {
   emit('validationChanged', formValid && hasIdentityRef);
 });
+
+watch(credential, () => {
+  setIdentityRef();
+}, { deep: true });
 
 watch(useUnmanagedNetwork, (neu, old) => {
   if (old && !neu) {
