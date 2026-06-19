@@ -62,7 +62,7 @@ capa:
           description: Set ingress rules for the worker nodes, used in addition to rules defined by CAPA. The source of each rule may be either CIDR blocks, security groups, or NAT gateways.
           label: Additional Node Ingress Rules
           ruleSectionTitlePrefix: Node
-        cniProviderBanner: "This cluster is configured to use the {cni} CNI. To change the CNI plugin, go to the <a href=\"#basic\" aria-label='CNI plugin setting in the Basic cluster configuration tab'>Basic RKE2 Cluster Configuration Section</a>."
+        cniProviderBanner: "This cluster is configured to use the {cni} CNI. CNI Ingress Rules will be automatically updated if the CNI is changed. To change the CNI plugin, go to the <a href=\"#basic\" aria-label='CNI plugin setting in the Basic cluster configuration tab'>Basic RKE2 Cluster Configuration Section</a>."
         cniIngressRules:
           description: CNI rules apply to both node and control plane security groups. The source for each rule will be set to the node and control plane security groups.
           label: CNI Ingress Rules

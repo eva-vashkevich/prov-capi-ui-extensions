@@ -15,6 +15,7 @@ import IngressRules from './IngressRules.vue';
 import SecurityOverrides from './SecurityOverrides.vue';
 import Banner from '@components/Banner/Banner.vue';
 import { isCapaManagedVpcId } from '../utils';
+import { CNI_INGRESS_RULES } from './constants';
 import { scrollToBottom } from '@shell/utils/scroll';
 import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole } from '../types/capa';
 
@@ -257,6 +258,27 @@ watch(allowCNIRules, (allowed) => {
     storedCNIIngressRules.value = [];
   }
 });
+
+watch(provClusterCNI, (newCni, oldCni) => {
+  const source = allowCNIRules.value ? cniIngressRules.value : storedCNIIngressRules.value;
+  const currentRules = [...(source || [])];
+
+  // Remove rules matching the old CNI
+  const oldRules = oldCni ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[oldCni] || [] : [];
+  const filtered = currentRules.filter((rule) => {
+    return !oldRules.some((oldRule) => oldRule.description === rule.description && oldRule.protocol === rule.protocol && oldRule.fromPort === rule.fromPort && oldRule.toPort === rule.toPort);
+  });
+
+  // Add rules for the new CNI
+  const newRules = newCni ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[newCni] || [] : [];
+  const updated = [...filtered, ...newRules];
+
+  if (allowCNIRules.value) {
+    emit('update:cniIngressRules', updated);
+  } else {
+    storedCNIIngressRules.value = updated;
+  }
+}, { immediate: true });
 </script>
 
 <template>

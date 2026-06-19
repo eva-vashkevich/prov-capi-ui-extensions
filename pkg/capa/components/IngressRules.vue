@@ -9,7 +9,7 @@ import RcSection from '@components/RcSection/RcSection.vue';
 import RcSectionActions from '@components/RcSection/RcSectionActions.vue';
 import { useI18n } from '@shell/composables/useI18n';
 import { removeEmptyFields } from '../utils';
-import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
+import { SECURITY_GROUP_ROLES } from './constants';
 import * as cidrValidators from '../validators';
 import Checkbox from '@components/Form/Checkbox/Checkbox.vue';
 import type { IngressRule, SecurityGroupProtocol } from '../types/capa';

@@ -11,6 +11,7 @@ import { _CREATE } from '@shell/config/query-params';
 import merge from 'lodash/merge';
 import debounce from 'lodash/debounce';
 import Networking from './Networking.vue';
+import { DEFAULT_CLUSTER_CONFIG } from './constants';
 import { NORMAN } from '@shell/config/types';
 import { get, set, remove } from '@shell/utils/object.js';
 import KeyValue from '@shell/components/form/KeyValue';
@@ -24,24 +25,7 @@ defineOptions({ name: 'ClusterConfiguration' });
 
 const emit = defineEmits<{(e: 'update:value', value: any): void, (e: 'validationChanged', value: boolean): void }>();
 
-const defaultConfig = {
-  spec: {
-    // TODO nb cni-specific roles
-    network: {
-      additionalControlPlaneIngressRules: [{
-        protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'], description: 'Allow all traffic between control plane and node security groups'
-      }],
-      additionalNodeIngressRules: [{
-        protocol: '-1', sourceSecurityGroupRoles: ['controlplane', 'node'], description: 'Allow all traffic between control plane and node security groups'
-      }],
-    },
-    sshKeyName:               '', // empty string -> no ssh key. unset -> use "default" key
-    controlPlaneLoadBalancer: {
-      healthCheckProtocol: 'TCP',
-      loadBalancerType:    'nlb'
-    }
-  }
-};
+const defaultConfig = DEFAULT_CLUSTER_CONFIG;
 
 interface Props {
   value: any;
