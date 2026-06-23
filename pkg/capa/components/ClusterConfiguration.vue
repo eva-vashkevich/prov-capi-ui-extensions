@@ -87,7 +87,8 @@ const securityGroupInfo = ref<AWS.SecurityGroup[]>([]);
 const loadingVpcs = ref(false);
 const loadingSubnets = ref(false);
 const loadingSecurityGroups = ref(false);
-
+const showIdentityError = ref(false)
+let identityRetryTimer: ReturnType<typeof setInterval> | null = null;
 
 const { getRules, isFormValid } = useFormValidation(
   t,
@@ -195,10 +196,65 @@ async function getCloudCredential(){
     return;
   }
   remove(value.value, 'spec.identityRef')
+  showIdentityError.value = false;
+
+  // Cancel any existing retry loop
+  if (identityRetryTimer) {
+    clearInterval(identityRetryTimer);
+    identityRetryTimer = null;
+  }
+
   try{
-    credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value });
+    credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: credentialId.value, opt: {force: true} });
     initDefaultRegion()
-    setIdentityRef()
+
+    if (credential.value?.annotations?.[CAPA.IDENTITY_REF]) {
+      setIdentityRef();
+    } else {
+      // Retry every 500ms for up to 5 seconds waiting for the annotation to appear
+      const maxAttempts = 10;
+      let attempts = 0;
+      const savedCredentialId = credentialId.value;
+
+      identityRetryTimer = setInterval(async() => {
+        attempts++;
+
+        // Stop if credential changed while retrying
+        if (credentialId.value !== savedCredentialId) {
+          if (identityRetryTimer) {
+            clearInterval(identityRetryTimer);
+            identityRetryTimer = null;
+          }
+          return;
+        }
+
+        try {
+          credential.value = await store.dispatch('rancher/find', { type: NORMAN.CLOUD_CREDENTIAL, id: savedCredentialId, opt: { force: true } });
+
+          if (credential.value?.annotations?.[CAPA.IDENTITY_REF]) {
+            setIdentityRef();
+            if (identityRetryTimer) {
+              clearInterval(identityRetryTimer);
+              identityRetryTimer = null;
+            }
+          } else if (attempts >= maxAttempts) {
+            showIdentityError.value = true;
+            if (identityRetryTimer) {
+              clearInterval(identityRetryTimer);
+              identityRetryTimer = null;
+            }
+          }
+        } catch {
+          if (attempts >= maxAttempts) {
+            showIdentityError.value = true;
+            if (identityRetryTimer) {
+              clearInterval(identityRetryTimer);
+              identityRetryTimer = null;
+            }
+          }
+        }
+      }, 500);
+    }
   } catch (e){
     credentialErrors.value.push(t('capa.errors.fetchingCloudCredential', { error: e }))
   }
@@ -341,6 +397,10 @@ watch([isFormValid, hasIdentityRef], ([formValid = true, hasIdentityRef]) => {
   emit('validationChanged', formValid && hasIdentityRef);
 });
 
+watch(credential, () => {
+  setIdentityRef();
+}, { deep: true });
+
 watch(useUnmanagedNetwork, (neu, old) => {
   if (old && !neu) {
     securityGroupOverrides.value = {};
@@ -386,7 +446,7 @@ watch([
   <div class="mb-20">
     <Banner :label="e" :key="e" v-for="e in credentialErrors" color="error"/>
     <Banner
-      v-if="credentialId && !hasIdentityRef"
+      v-if="credentialId && showIdentityError"
       color="error"
       :label="t('capa.errors.missingIdentityRef', { annotation: CAPA.IDENTITY_REF }, true)"
     />
