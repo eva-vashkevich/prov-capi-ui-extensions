@@ -3,7 +3,7 @@ name: Build and Release Extension Catalog
 on:
   workflow_dispatch:
   release:
-    types: [released]
+    types: [prereleased, released]
 
 defaults:
   run:
