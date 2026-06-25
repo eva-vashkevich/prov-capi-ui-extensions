@@ -15,8 +15,10 @@ import IngressRules from './IngressRules.vue';
 import SecurityOverrides from './SecurityOverrides.vue';
 import Banner from '@components/Banner/Banner.vue';
 import { isCapaManagedVpcId } from '../utils';
+import { CNI_INGRESS_RULES } from './constants';
 import { scrollToBottom } from '@shell/utils/scroll';
 import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole } from '../types/capa';
+import { isEqual } from '@shell/utils/object'
 
 defineOptions({ name: 'Networking' });
 
@@ -257,6 +259,31 @@ watch(allowCNIRules, (allowed) => {
     storedCNIIngressRules.value = [];
   }
 });
+
+watch(provClusterCNI, (newCni = '', oldCni='') => {
+  // if the CNI ingress rules ui is currently hidden because its overriden, update stored values so rules are correct if overrides are removed
+  const source = allowCNIRules.value ? cniIngressRules.value : storedCNIIngressRules.value;
+  const currentRules = [...(source || [])];
+
+  // match cni options that include multus, eg "multus, calico" should use calico rules
+  const oldCNIKey = Object.keys(CNI_INGRESS_RULES).find(k=>oldCni.includes(k))
+  // Remove rules matching the old CNI
+  const oldRules = oldCNIKey ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[oldCNIKey] || [] : [];
+  const filtered = currentRules.filter((rule) => {
+    return !oldRules.some((oldRule) => isEqual(oldRule, rule));
+  });
+
+  const newCNIKey = Object.keys(CNI_INGRESS_RULES).find(k=>newCni.includes(k))
+  // Add rules for the new CNI
+  const newRules = newCNIKey ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[newCNIKey] || [] : [];
+  const updated = [...filtered, ...newRules];
+
+  if (allowCNIRules.value) {
+    emit('update:cniIngressRules', updated);
+  } else {
+    storedCNIIngressRules.value = updated;
+  }
+}, { immediate: true });
 </script>
 
 <template>

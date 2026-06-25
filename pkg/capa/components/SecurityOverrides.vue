@@ -11,7 +11,7 @@ import { useI18n } from '@shell/composables/useI18n';
 import KeyValue from '@shell/components/form/KeyValue.vue';
 import ButtonDropdown from '@shell/components/ButtonDropdown.vue';
 import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
-import { SECURITY_GROUP_ROLES } from '../machine-config/constants';
+import { SECURITY_GROUP_ROLES } from './constants';
 import type { SecurityGroupRole } from '../types/capa';
 
 defineOptions({ name: 'SecurityGroupOverrides' });
