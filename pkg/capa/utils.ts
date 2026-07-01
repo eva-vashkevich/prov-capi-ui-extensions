@@ -74,6 +74,13 @@ export async function prepareProvCluster(cluster: any, context: StoreContext): P
   }
   if (!cluster?.spec?.rkeConfig?.machineSelectorConfig) {
     set(cluster, 'spec.rkeConfig.machineSelectorConfig', MACHINE_SELECTOR_CONFIG);
+  } else {
+    const selectorConfig: any[] = cluster?.spec?.rkeConfig?.machineSelectorConfig || [];
+    const allPresent = MACHINE_SELECTOR_CONFIG.every((required) => selectorConfig.some((entry) => JSON.stringify(entry) === JSON.stringify(required)));
+
+    if (!allPresent) {
+      set(cluster, 'spec.rkeConfig.machineSelectorConfig', [...selectorConfig, ...MACHINE_SELECTOR_CONFIG]);
+    }
   }
 }
 
