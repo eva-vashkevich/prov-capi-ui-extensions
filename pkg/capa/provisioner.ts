@@ -20,7 +20,7 @@ export const detailTabs = {
 
 export const PROVIDER = 'awsmachinetemplate';
 export class CAPAProvisioner implements IClusterProvisioner {
-  static ID = PROVIDER
+  static ID = PROVIDER;
 
   constructor(private context: ClusterProvisionerContext) {
     context.dispatch('plugins/mapDriver', { name: this.id, to: 'aws' }, { root: true });

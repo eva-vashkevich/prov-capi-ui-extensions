@@ -35,7 +35,7 @@ Save the cluster once all sections validate. The extension creates the `AWSClust
 
 ### Editing a cluster
 
-Infrastructure cluster edits are patched onto the existing `AWSCluster` (with basic 3-way conflict resolution if the CAPA controller changed the object concurrently). Because upstream CAPI machine templates are immutable, editing a machine pool's instance config creates a **new** `AWSMachineTemplate`, repoints the pool at it, and removes the old template only after the cluster save succeeds — so a failed save never leaves a pool pointing at a deleted template. Removing a pool deletes its associated machine template.
+Infrastructure cluster edits are patched onto the existing `AWSCluster` (with basic 3-way conflict resolution if the CAPA controller changed the object concurrently). Because upstream CAPI machine templates are immutable, editing a machine pool's instance config creates a **new** `AWSMachineTemplate` and repoints the pool at it. On Rancher 2.16+, every `AWSCluster` and `AWSMachineTemplate` the extension creates (including these replacement templates) is labelled `provisioning.cattle.io/infra-cleanup-enabled: "true"`, which lets Rancher garbage-collect it once it is no longer referenced. On 2.16+, a replaced template, or the template of a removed pool, that doesn't have the label yet (e.g. created on an earlier version) gets it added, so the UI never deletes templates itself. Existing objects that aren't replaced or removed are left as they are. On earlier versions, or if adding the label fails, the UI removes replaced templates and those of removed pools itself, only after the cluster save succeeds — so a failed save never leaves a pool pointing at a deleted template.
 
 ### Troubleshooting
 

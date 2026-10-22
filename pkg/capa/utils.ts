@@ -1,5 +1,6 @@
 import { normalizeName } from '@shell/utils/kube';
-import { DEFAULT_WORKSPACE } from '@shell/config/types';
+import { DEFAULT_WORKSPACE, MANAGEMENT } from '@shell/config/types';
+import { SETTING } from '@shell/config/settings';
 import { set, diff, isEmpty } from '@shell/utils/object';
 import { createDoNotLogError } from '@shell/utils/error';
 import { handleConflict } from '@shell/plugins/dashboard-store/normalize';
@@ -7,7 +8,7 @@ import {
   AWS_MACHINE_TEMPLATE_SCHEMA, AWS_CLUSTER_SCHEMA, InfrastructureClusterResource, InfrastructureMachineResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext
 } from './types/capa';
 import * as AWS from '@shell/types/aws-sdk';
-import { CAPA } from './labels-annotations';
+import { CAPA, PROVISIONING } from './labels-annotations';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -217,6 +218,55 @@ async function patchInfrastructureClusterChanges(
   return true;
 }
 
+// Rancher 2.16+ periodically deletes unused AWSCluster/AWSMachineTemplate objects, but only
+// those opted in via this label, so the label is only set there.
+// Unparseable versions (e.g. dev builds) are treated as supported.
+function supportsAutoCleanup(context: StoreContext): boolean {
+  const version = context.getters['management/byId'](MANAGEMENT.SETTING, SETTING.VERSION_RANCHER)?.value || '';
+  const match = version.match(/^v?(\d+)\.(\d+)/);
+
+  if (!match) {
+    return true;
+  }
+
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+
+  return major !== 2 || (major === 2 && minor >= 16);
+}
+
+// Merge the cleanup label into any existing labels on newly created objects.
+function setAutoCleanupLabel(resource: InfrastructureClusterResource | InfrastructureMachineResource): void {
+  resource.metadata = resource.metadata || {};
+  resource.metadata.labels = {
+    ...(resource.metadata.labels || {}),
+    [PROVISIONING.INFRA_CLEANUP_ENABLED]: 'true',
+  };
+}
+
+// Objects without the label are never cleaned up by Rancher, so the UI removes them. On 2.16+ replaced and
+// removed templates are labelled first, so this only applies to older versions or if labelling failed.
+function hasAutoCleanupLabel(resource: InfrastructureClusterResource | InfrastructureMachineResource | null | undefined): boolean {
+  return resource?.metadata?.labels?.[PROVISIONING.INFRA_CLEANUP_ENABLED] === 'true';
+}
+
+// Label an existing template that is being replaced or removed (e.g. created before 2.16) so Rancher takes
+// over its cleanup. Labels can be
+// changed on existing templates; only their spec is immutable.
+async function labelExistingTemplate(resource: InfrastructureMachineResource | null): Promise<void> {
+  if (!resource?.patch || hasAutoCleanupLabel(resource)) {
+    return;
+  }
+
+  try {
+    await resource.patch({ metadata: { labels: { [PROVISIONING.INFRA_CLEANUP_ENABLED]: 'true' } } }, { headers: { 'content-type': 'application/merge-patch+json' } });
+    setAutoCleanupLabel(resource);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('capa: failed to label machine template for cleanup', e);
+  }
+}
+
 function serializeResource(resource: any): any {
   return typeof resource?.toJSON === 'function' ? resource.toJSON() : resource;
 }
@@ -361,10 +411,14 @@ export async function createMachinePoolMachineConfig(machineConfigSchema: Machin
 
 export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: ClusterValue, context: StoreContext): Promise<void> {
   const finalPools: MachinePool[] = [];
+  const autoCleanup = supportsAutoCleanup(context);
   const clusterName = cluster.metadata?.name || 'cluster';
 
   for (const entry of pools) {
     if (entry.remove) {
+      if (autoCleanup) {
+        await labelExistingTemplate(entry.config);
+      }
       continue;
     }
 
@@ -383,6 +437,10 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
           entry.config.metadata.generateName = `nc-${ prefixFormatted }-`;
         }
 
+        if (autoCleanup) {
+          setAutoCleanupLabel(entry.config);
+        }
+
         const neu = await entry.config.save();
 
         entry.config = neu;
@@ -391,7 +449,8 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         entry.update = true;
       } else if (entry.update) {
         // Upstream CAPI machine templates are immutable: create a replacement resource
-        // with the current spec values, update the pool reference, then remove the old one.
+        // with the current spec values and update the pool reference. The replaced template
+        // is removed by cleanupMachinePoolConfigs unless Rancher will clean it up.
         if (!await machineConfigWasModified(entry, context)) {
           finalPools.push(entry.pool);
           continue;
@@ -413,6 +472,9 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         delete newConfig.metadata.uid;
         delete newConfig.links;
         newConfig.metadata.generateName = `nc-${ prefixFormatted }-`;
+        if (autoCleanup) {
+          setAutoCleanupLabel(newConfig);
+        }
 
         const neu = await newConfig.save();
 
@@ -424,6 +486,10 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         // cluster save) risks leaving the pool pointing at a deleted template if
         // the cluster save then fails. cleanupMachinePoolConfigs handles removal.
         entry.oldConfig = oldConfig;
+
+        if (autoCleanup) {
+          await labelExistingTemplate(oldConfig);
+        }
       }
     } catch (e) {
       throw new Error(formatErrorMessage(context, 'capa.errors.savingMachineConfig', e));
@@ -439,7 +505,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
 
 export async function cleanupMachinePoolConfigs(pools: PoolEntry[]): Promise<void> {
   for (const entry of pools) {
-    if (entry.remove && entry.config?.remove) {
+    if (entry.remove && entry.config?.remove && !hasAutoCleanupLabel(entry.config)) {
       try {
         await entry.config.remove();
       } catch (e) {
@@ -448,15 +514,15 @@ export async function cleanupMachinePoolConfigs(pools: PoolEntry[]): Promise<voi
       }
     }
 
-    if (entry.oldConfig?.remove) {
+    if (entry.oldConfig?.remove && !hasAutoCleanupLabel(entry.oldConfig)) {
       try {
         await entry.oldConfig.remove();
       } catch (e) {
         // eslint-disable-next-line no-console
         console.warn('capa: failed to remove replaced machine template', e);
       }
-      entry.oldConfig = null;
     }
+    entry.oldConfig = null;
   }
 }
 
@@ -472,6 +538,9 @@ export async function saveInfrastructureCluster(value: ClusterValue, infrastruct
       infrastructureCluster.metadata.generateName = `infra-`;
     } else {
       infrastructureCluster.metadata.name = value.metadata.name;
+    }
+    if (supportsAutoCleanup(context)) {
+      setAutoCleanupLabel(infrastructureCluster);
     }
   }
   try {

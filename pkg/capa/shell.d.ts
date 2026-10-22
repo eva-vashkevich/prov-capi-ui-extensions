@@ -26,6 +26,13 @@ declare module '@shell/config/types' {
   };
 }
 
+declare module '@shell/config/settings' {
+  export const SETTING: {
+    VERSION_RANCHER: string;
+    [key: string]: string;
+  };
+}
+
 declare module '@shell/config/product/explorer.js' {
   export const NAME: string;
 }
