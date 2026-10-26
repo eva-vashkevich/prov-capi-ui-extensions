@@ -1,3 +1,4 @@
+import isEqual from 'lodash/isEqual';
 import { normalizeName } from '@shell/utils/kube';
 import { DEFAULT_WORKSPACE } from '@shell/config/types';
 import { set, diff, isEmpty } from '@shell/utils/object';
@@ -474,6 +475,9 @@ export async function saveInfrastructureCluster(value: ClusterValue, infrastruct
       infrastructureCluster.metadata.name = value.metadata.name;
     }
   }
+  // AWS rejects security group updates that contain the same permission twice
+  dedupeInfrastructureClusterIngressRules(infrastructureCluster.spec);
+
   try {
     if (isEdit) {
       await patchInfrastructureClusterChanges(initialInfrastructureCluster, infrastructureCluster, context);
@@ -525,6 +529,51 @@ export function removeEmptyFields(input: any): any {
   }
 
   return input;
+}
+
+/**
+ * Remove exact (deep-equal) duplicate ingress rules, keeping the first occurrence and the original order.
+ * AWS rejects AuthorizeSecurityGroupIngress requests that contain the same permission more than once,
+ * so a duplicated rule in the AWSCluster spec breaks security group reconciliation.
+ */
+export function dedupeIngressRules<T>(rules: T[] = []): T[] {
+  return (rules || []).reduce((acc: T[], rule: T) => {
+    if (!acc.some((r) => isEqual(r, rule))) {
+      acc.push(rule);
+    }
+
+    return acc;
+  }, []);
+}
+
+/**
+ * Dedupe every ingress rule list in an AWSCluster spec in place. Lists that are already unique are left untouched
+ * so the edit-mode patch diff does not change.
+ */
+export function dedupeInfrastructureClusterIngressRules(spec: any): void {
+  const network = spec?.network;
+
+  if (!network) {
+    return;
+  }
+
+  const lists: [any, string][] = [
+    [network, 'additionalControlPlaneIngressRules'],
+    [network, 'additionalNodeIngressRules'],
+    [network.cni, 'cniIngressRules'],
+  ];
+
+  lists.forEach(([parent, key]) => {
+    const rules = parent?.[key];
+
+    if (Array.isArray(rules)) {
+      const deduped = dedupeIngressRules(rules);
+
+      if (deduped.length !== rules.length) {
+        parent[key] = deduped;
+      }
+    }
+  });
 }
 
 export function isCapaManagedVpcId(vpcId = '', vpcs = [] as AWS.VPC[]) {

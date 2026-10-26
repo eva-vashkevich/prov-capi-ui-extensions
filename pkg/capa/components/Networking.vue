@@ -14,11 +14,11 @@ import LabeledInput from '@components/Form/LabeledInput/LabeledInput.vue';
 import IngressRules from './IngressRules.vue';
 import SecurityOverrides from './SecurityOverrides.vue';
 import Banner from '@components/Banner/Banner.vue';
-import { isCapaManagedVpcId } from '../utils';
+import { isCapaManagedVpcId, dedupeIngressRules } from '../utils';
 import { CNI_INGRESS_RULES } from './constants';
 import { scrollToBottom } from '@shell/utils/scroll';
 import type { IngressRule, CNIIngressRule, SubnetSpec, SecurityGroupRole } from '../types/capa';
-import { isEqual } from '@shell/utils/object';
+import isEqual from 'lodash/isEqual';
 
 defineOptions({ name: 'Networking' });
 
@@ -260,23 +260,34 @@ watch(allowCNIRules, (allowed) => {
   }
 });
 
+// match cni options that include multus, eg "multus, calico" should use calico rules
+function cniPresetRules(cni = ''): CNIIngressRule[] {
+  const key = Object.keys(CNI_INGRESS_RULES).find((k) => cni.includes(k));
+
+  return key ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[key] || [] : [];
+}
+
+// This watcher runs immediately every time this component is mounted, e.g. when editing a cluster whose spec
+// already contains the CNI rules. On those runs oldCni is undefined, so it must be idempotent: only add CNI rules
+// that are not already present.
 watch(provClusterCNI, (newCni = '', oldCni = '') => {
   // if the CNI ingress rules ui is currently hidden because its overriden, update stored values so rules are correct if overrides are removed
   const source = allowCNIRules.value ? cniIngressRules.value : storedCNIIngressRules.value;
   const currentRules = [...(source || [])];
 
-  // match cni options that include multus, eg "multus, calico" should use calico rules
-  const oldCNIKey = Object.keys(CNI_INGRESS_RULES).find((k) => oldCni.includes(k));
-  // Remove rules matching the old CNI
-  const oldRules = oldCNIKey ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[oldCNIKey] || [] : [];
-  const filtered = currentRules.filter((rule) => {
+  // Remove rules matching the old CNI. Rules the user added or edited don't match the presets and are kept.
+  const oldRules = cniPresetRules(oldCni);
+  const filtered = dedupeIngressRules(currentRules.filter((rule) => {
     return !oldRules.some((oldRule) => isEqual(oldRule, rule));
-  });
+  }));
 
-  const newCNIKey = Object.keys(CNI_INGRESS_RULES).find((k) => newCni.includes(k));
-  // Add rules for the new CNI
-  const newRules = newCNIKey ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[newCNIKey] || [] : [];
+  // Add rules for the new CNI, skipping any that are already in the list
+  const newRules = cniPresetRules(newCni).filter((newRule) => !filtered.some((rule) => isEqual(newRule, rule)));
   const updated = [...filtered, ...newRules];
+
+  if (isEqual(updated, currentRules)) {
+    return;
+  }
 
   if (allowCNIRules.value) {
     emit('update:cniIngressRules', updated);

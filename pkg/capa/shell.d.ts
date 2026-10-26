@@ -151,6 +151,18 @@ declare module 'lodash/merge' {
   export default function merge<TObject>(object: TObject, ...sources: any[]): TObject & Record<string, any>;
 }
 
+declare module 'lodash/mergeWith' {
+  export default function mergeWith<TObject>(object: TObject, ...sourcesAndCustomizer: any[]): TObject & Record<string, any>;
+}
+
+declare module 'lodash/cloneDeep' {
+  export default function cloneDeep<T>(value: T): T;
+}
+
+declare module 'lodash/isEqual' {
+  export default function isEqual(value: any, other: any): boolean;
+}
+
 declare module '@shell/config/query-params' {
   export const _CREATE: string;
 }
