@@ -1,7 +1,5 @@
 import { IClusterProvisioner, ClusterProvisionerContext } from '@shell/core/types';
-import {
-  createMachinePoolMachineConfig, initInfrastructureCluster, saveMachinePoolConfigs, cleanupMachinePoolConfigs, saveInfrastructureCluster
-} from './utils';
+import { createMachinePoolMachineConfig, initInfrastructureCluster, saveMachinePoolConfigs, saveInfrastructureCluster } from './utils';
 import { AWS_CLUSTER_SCHEMA, AWS_MACHINE_TEMPLATE_SCHEMA, InfrastructureClusterResource } from './types/capa';
 import { CAPI } from '@shell/config/types';
 import InfrastructureClusterConfiguration from './components/InfrastructureClusterConfiguration.vue';
@@ -48,8 +46,11 @@ export class CAPAProvisioner implements IClusterProvisioner {
     return async(pools: any[], cluster: any) => await saveMachinePoolConfigs(pools, cluster, this.context);
   }
 
+  // The UI never deletes machine templates: replaced ones and those of removed pools are labelled in
+  // saveMachinePoolConfigs and Rancher cleans them up once unused. This no-op is still needed, otherwise
+  // rke2.vue falls back to deleting removed pools' machine configs itself.
   get cleanupMachinePools(): (pools: any[]) => Promise<void> {
-    return async(pools: any[]) => await cleanupMachinePoolConfigs(pools);
+    return async() => {};
   }
 
   get saveInfrastructureCluster(): (value: any, infrastructureCluster: any, isEdit: boolean, initialInfrastructureCluster?: any) => Promise<void> {

@@ -156,7 +156,6 @@ export interface PoolEntry {
   update?: boolean;
   pool: MachinePool;
   config: InfrastructureMachineResource | null;
-  oldConfig?: InfrastructureMachineResource | null;
 }
 
 export interface MachineConfigSchema {
