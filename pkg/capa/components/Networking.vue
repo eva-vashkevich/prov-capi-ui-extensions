@@ -267,6 +267,11 @@ function cniPresetRules(cni = ''): CNIIngressRule[] {
   return key ? (CNI_INGRESS_RULES as Record<string, CNIIngressRule[]>)[key] || [] : [];
 }
 
+// AWS identifies a CNI rule's permission by protocol and port range; the description doesn't make it distinct
+function isSameCNIPermission(a: CNIIngressRule, b: CNIIngressRule): boolean {
+  return a.protocol === b.protocol && a.fromPort === b.fromPort && a.toPort === b.toPort;
+}
+
 // This watcher runs immediately every time this component is mounted, e.g. when editing a cluster whose spec
 // already contains the CNI rules. On those runs oldCni is undefined, so it must be idempotent: only add CNI rules
 // that are not already present.
@@ -281,8 +286,9 @@ watch(provClusterCNI, (newCni = '', oldCni = '') => {
     return !oldRules.some((oldRule) => isEqual(oldRule, rule));
   }));
 
-  // Add rules for the new CNI, skipping any that are already in the list
-  const newRules = cniPresetRules(newCni).filter((newRule) => !filtered.some((rule) => isEqual(newRule, rule)));
+  // Add rules for the new CNI, skipping any whose permission is already in the list (e.g. an edited preset or a
+  // custom rule on the same ports), since AWS rejects duplicate permissions
+  const newRules = cniPresetRules(newCni).filter((newRule) => !filtered.some((rule) => isSameCNIPermission(newRule, rule)));
   const updated = [...filtered, ...newRules];
 
   if (isEqual(updated, currentRules)) {
