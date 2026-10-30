@@ -8,7 +8,8 @@ import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import Banner from '@components/Banner/Banner.vue';
 import { RcSection } from '@components/RcSection';
 import { _CREATE, _VIEW } from '@shell/config/query-params';
-import merge from 'lodash/merge';
+import mergeWith from 'lodash/mergeWith';
+import cloneDeep from 'lodash/cloneDeep';
 import debounce from 'lodash/debounce';
 import Networking from './Networking.vue';
 import { DEFAULT_CLUSTER_CONFIG } from './constants';
@@ -376,7 +377,11 @@ const debouncedFetchAll = debounce((fetchRegions: boolean) => {
 
 onMounted(async() => {
   if (mode.value === _CREATE) {
-    const valueWithDefaults = merge({}, defaultConfig, value.value);
+    // Arrays already on the value (e.g. additionalNodeIngressRules) replace the defaults rather than being merged
+    // index-by-index, which would re-insert or duplicate default rules if this component is mounted again.
+    const valueWithDefaults = mergeWith({}, defaultConfig, value.value, (_objValue: unknown, srcValue: unknown) => {
+      return Array.isArray(srcValue) ? cloneDeep(srcValue) : undefined;
+    });
 
     emit('update:value', valueWithDefaults || {});
   }

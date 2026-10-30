@@ -147,10 +147,6 @@ declare module '@components/Banner' {
   export const Banner: any;
 }
 
-declare module 'lodash/merge' {
-  export default function merge<TObject>(object: TObject, ...sources: any[]): TObject & Record<string, any>;
-}
-
 declare module '@shell/config/query-params' {
   export const _CREATE: string;
 }
