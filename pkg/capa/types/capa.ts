@@ -12,6 +12,7 @@ export interface ResourceMetadata {
   generateName?: string;
   resourceVersion?: string;
   uid?: string;
+  labels?: StringMap;
 }
 
 export interface InfrastructureRef {
@@ -124,6 +125,7 @@ export interface InfrastructureMachineResource {
   links?: Record<string, unknown>;
   save: () => Promise<InfrastructureMachineResource>;
   remove?: () => Promise<void>;
+  patch?: (data: unknown, opt?: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface MachinePool {
@@ -154,7 +156,6 @@ export interface PoolEntry {
   update?: boolean;
   pool: MachinePool;
   config: InfrastructureMachineResource | null;
-  oldConfig?: InfrastructureMachineResource | null;
 }
 
 export interface MachineConfigSchema {

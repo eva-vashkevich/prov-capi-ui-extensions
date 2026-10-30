@@ -8,7 +8,7 @@ import {
   AWS_MACHINE_TEMPLATE_SCHEMA, AWS_CLUSTER_SCHEMA, InfrastructureClusterResource, InfrastructureMachineResource, ClusterValue, MachineConfigSchema, MachinePool, PoolEntry, StoreContext
 } from './types/capa';
 import * as AWS from '@shell/types/aws-sdk';
-import { CAPA } from './labels-annotations';
+import { CAPA, PROVISIONING } from './labels-annotations';
 
 const ADDITIONAL_MANIFEST = `apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -218,6 +218,35 @@ async function patchInfrastructureClusterChanges(
   return true;
 }
 
+// Merge the cleanup label into any existing labels on newly created objects.
+function setAutoCleanupLabel(resource: InfrastructureClusterResource | InfrastructureMachineResource): void {
+  resource.metadata = resource.metadata || {};
+  resource.metadata.labels = {
+    ...(resource.metadata.labels || {}),
+    [PROVISIONING.INFRA_CLEANUP_ENABLED]: 'true',
+  };
+}
+
+function hasAutoCleanupLabel(resource: InfrastructureClusterResource | InfrastructureMachineResource | null | undefined): boolean {
+  return resource?.metadata?.labels?.[PROVISIONING.INFRA_CLEANUP_ENABLED] === 'true';
+}
+
+// Label an existing template that is being replaced or removed (e.g. created before the label was set) so
+// Rancher takes over its cleanup. Labels can be changed on existing templates; only their spec is immutable.
+async function labelExistingTemplate(resource: InfrastructureMachineResource | null): Promise<void> {
+  if (!resource?.patch || hasAutoCleanupLabel(resource)) {
+    return;
+  }
+
+  try {
+    await resource.patch({ metadata: { labels: { [PROVISIONING.INFRA_CLEANUP_ENABLED]: 'true' } } }, { headers: { 'content-type': 'application/merge-patch+json' } });
+    setAutoCleanupLabel(resource);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('capa: failed to label machine template for cleanup', e);
+  }
+}
+
 function serializeResource(resource: any): any {
   return typeof resource?.toJSON === 'function' ? resource.toJSON() : resource;
 }
@@ -366,6 +395,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
 
   for (const entry of pools) {
     if (entry.remove) {
+      await labelExistingTemplate(entry.config);
       continue;
     }
 
@@ -384,6 +414,8 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
           entry.config.metadata.generateName = `nc-${ prefixFormatted }-`;
         }
 
+        setAutoCleanupLabel(entry.config);
+
         const neu = await entry.config.save();
 
         entry.config = neu;
@@ -392,7 +424,8 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         entry.update = true;
       } else if (entry.update) {
         // Upstream CAPI machine templates are immutable: create a replacement resource
-        // with the current spec values, update the pool reference, then remove the old one.
+        // with the current spec values and update the pool reference. The replaced template
+        // is labelled and left for Rancher to clean up once it is no longer used.
         if (!await machineConfigWasModified(entry, context)) {
           finalPools.push(entry.pool);
           continue;
@@ -405,7 +438,7 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
           continue;
         }
 
-        // Clone before mutating so oldConfig retains its identity (links/id) for removal.
+        // Clone before mutating so oldConfig retains its identity (links/id) for labelling.
         const newConfig = await context.dispatch('management/clone', { resource: oldConfig }) as InfrastructureMachineResource;
 
         delete newConfig.id;
@@ -414,17 +447,14 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
         delete newConfig.metadata.uid;
         delete newConfig.links;
         newConfig.metadata.generateName = `nc-${ prefixFormatted }-`;
+        setAutoCleanupLabel(newConfig);
 
         const neu = await newConfig.save();
 
         entry.config = neu;
         entry.pool.machineConfigRef.name = neu.metadata.name;
 
-        // Defer removing the old (now-replaced) template until after the cluster
-        // save commits the new machineConfigRef. Removing it here (before the
-        // cluster save) risks leaving the pool pointing at a deleted template if
-        // the cluster save then fails. cleanupMachinePoolConfigs handles removal.
-        entry.oldConfig = oldConfig;
+        await labelExistingTemplate(oldConfig);
       }
     } catch (e) {
       throw new Error(formatErrorMessage(context, 'capa.errors.savingMachineConfig', e));
@@ -436,29 +466,6 @@ export async function saveMachinePoolConfigs(pools: PoolEntry[], cluster: Cluste
     cluster.spec.rkeConfig = {};
   }
   cluster.spec.rkeConfig.machinePools = finalPools;
-}
-
-export async function cleanupMachinePoolConfigs(pools: PoolEntry[]): Promise<void> {
-  for (const entry of pools) {
-    if (entry.remove && entry.config?.remove) {
-      try {
-        await entry.config.remove();
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn('capa: failed to remove machine config for removed pool', e);
-      }
-    }
-
-    if (entry.oldConfig?.remove) {
-      try {
-        await entry.oldConfig.remove();
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn('capa: failed to remove replaced machine template', e);
-      }
-      entry.oldConfig = null;
-    }
-  }
 }
 
 export async function saveInfrastructureCluster(value: ClusterValue, infrastructureCluster: InfrastructureClusterResource | null, context: StoreContext, isEdit = false, initialInfrastructureCluster: InfrastructureClusterResource | null = null): Promise<void> {
@@ -474,6 +481,7 @@ export async function saveInfrastructureCluster(value: ClusterValue, infrastruct
     } else {
       infrastructureCluster.metadata.name = value.metadata.name;
     }
+    setAutoCleanupLabel(infrastructureCluster);
   }
   // AWS rejects security group updates that contain the same permission twice
   dedupeInfrastructureClusterIngressRules(infrastructureCluster.spec);
