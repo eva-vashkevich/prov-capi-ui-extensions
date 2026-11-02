@@ -22,12 +22,17 @@ describe('CAPA provisioner', { testIsolation: false, tags: ['@adminUser'] }, () 
 
   describe('cluster create grid', () => {
     it('offers CAPI AWS when the aws CAPIProvider is installed', () => {
+      // Without an AWS credential the form shows "create a new credential" instead of the select,
+      // so don't depend on what the Rancher under test already has
+      stubAwsCloudCredential();
+
       ClusterManagerCreatePagePo.goTo('_');
       createPage.waitForPage();
 
       CruCapaPo.card().should('be.visible').click();
 
       cy.url().should('include', `type=${ CAPA_PROVISIONER }`);
+      capaPage.rke2PageTitle().should('include', 'Cluster API Provider AWS');
       capaPage.credentialSelect().checkVisible();
     });
 

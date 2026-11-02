@@ -57,9 +57,23 @@ sudo k3s kubectl config view --raw > "$KUBECONFIG"
 chmod 600 "$KUBECONFIG"
 
 echo -e "${YELLOW}Installing helm..........${RESET}"
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-chmod 700 get_helm.sh
-./get_helm.sh
+# A pinned release binary rather than helm's get-helm-3 script, which is fetched from its main
+# branch and would run unreviewed code. The checksum is the one published with the release
+# (https://github.com/helm/helm/releases/tag/v3.22.1).
+HELM_VERSION=v3.22.1
+HELM_CHECKSUM=896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea
+curl -fsSL -o helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+
+DOWNLOADED_CHECKSUM=$(sha256sum helm.tar.gz | awk '{print $1}')
+if [ "$DOWNLOADED_CHECKSUM" != "${HELM_CHECKSUM}" ]; then
+  echo -e "${RED}Error: helm checksum mismatch! Expected ${HELM_CHECKSUM} but got $DOWNLOADED_CHECKSUM${RESET}"
+  exit 1
+fi
+
+tar -xzf helm.tar.gz linux-amd64/helm
+sudo install -m 0755 linux-amd64/helm /usr/local/bin/helm
+rm -rf helm.tar.gz linux-amd64
+helm version
 
 echo -e "${YELLOW}Installing cert-manager..........${RESET}"
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.7.1/cert-manager.crds.yaml
@@ -110,7 +124,9 @@ echo -e "${YELLOW}Waiting for dashboard UI to be reachable..........${RESET}"
 okay=0
 STATUS=""
 while [ $okay -lt 60 ]; do
-  STATUS=$(curl --silent --location --head -k "$TEST_BASE_URL/dashboard/" | awk -F'HTTP/2 ' '{print $2}' | awk 'length { print $1}')
+  # Status of the final response after redirects, whatever the HTTP version; 000 while Rancher
+  # isn't reachable yet. `|| true` because curl then exits non-zero, which `set -e` would abort on.
+  STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' --location --max-time 10 -k "$TEST_BASE_URL/dashboard/") || true
   echo "Status: $STATUS (Try: $okay)"
   if [ "$STATUS" == "200" ]; then
     break
@@ -167,7 +183,8 @@ fi
 echo -e "${YELLOW}Waiting for rancher imperative api to be running...${RESET}"
 okay=0
 while [ $okay -lt $wait ] ; do
-  STATUS=$(kubectl get apiservice v1.ext.cattle.io -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)
+  # `|| true`: kubectl exits non-zero until the apiservice is registered, which `set -e` would abort on
+  STATUS=$(kubectl get apiservice v1.ext.cattle.io -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)
 
   if [ "$STATUS" = "True" ]; then
     break
