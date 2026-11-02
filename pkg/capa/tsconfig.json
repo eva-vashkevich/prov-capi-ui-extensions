@@ -39,13 +39,13 @@
       "@components/*": [
         "@rancher/components/*"
       ]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": [
     "**/*.ts",
     "**/*.d.ts",
-    "**/*.tsx", 
-    "utils/svgTransform.js"  
+    "**/*.tsx"
   ],
   "exclude": [
     "../../node_modules"
