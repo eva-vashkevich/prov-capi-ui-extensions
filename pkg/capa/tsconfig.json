@@ -44,7 +44,8 @@
   "include": [
     "**/*.ts",
     "**/*.d.ts",
-    "**/*.tsx"
+    "**/*.tsx", 
+    "utils/svgTransform.js"  
   ],
   "exclude": [
     "../../node_modules"
